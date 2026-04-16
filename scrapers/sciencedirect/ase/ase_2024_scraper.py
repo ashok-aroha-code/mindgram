@@ -31,6 +31,15 @@ class Driver:
         self.options.add_argument("--window-size=1280,800")
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--disable-dev-shm-usage")
+        
+        # Speed optimizations: don't wait for full page load and block heavy resources
+        self.options.page_load_strategy = 'eager'
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.managed_default_content_settings.fonts": 2,
+        }
+        self.options.add_experimental_option("prefs", prefs)
+        
         try:
             self.driver = uc.Chrome(options=self.options)
         except Exception as e:
@@ -44,9 +53,9 @@ class Driver:
         """Safely closes the browser and silences WinError 6."""
         if hasattr(self, "driver") and self.driver:
             logger.info("Closing browser session...")
+            driver_ref = self.driver
             try:
-                self.driver.quit()
-                self.driver = None
+                driver_ref.quit()
             except Exception as e:
                 # Silence WinError 6 (The handle is invalid) which is common on Windows with undetected_chromedriver
                 if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
@@ -54,6 +63,12 @@ class Driver:
                 else:
                     logger.warning(f"Error during browser closure: {e}")
             finally:
+                # Prevent the object's __del__ method from throwing the same error later during garbage collection
+                try:
+                    driver_ref.quit = lambda: None
+                except Exception:
+                    pass
+                self.driver = None
                 logger.info("Browser session closed.")
 
 
@@ -120,8 +135,8 @@ class ScrapAbstractsLinks:
                     self.fetch_issue_page(page)
                     self.extract_links(page)
 
-                    # Random delay between issues to avoid detection
-                    delay = random.uniform(3, 6)
+                    # Random delay between issues to avoid detection (optimized for speed)
+                    delay = random.uniform(1.5, 3.0)
                     logger.debug(f"Sleeping for {delay:.2f}s...")
                     time.sleep(delay)
 
