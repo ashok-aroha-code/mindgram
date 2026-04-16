@@ -1,0 +1,22 @@
+core_fields:
+  link: "RUNTIME_VAR"
+  title: ".Head.u-font-serif.u-h2.u-margin-s-ver #screen-reader-main-title .title-text"
+  doi: ".ArticleIdentifierLinks a.doi"
+  number: ""
+  author_info: ".AuthorGroups .author-group a.anchor-secondary"
+  abstract: ".Body #body > div"
+  abstract_html: ".Body #body > div"
+  abstract_markdown: ".Body #body > div"
+
+abstract_metadata:
+  publication_date: ".publication-volume .text-xs"
+  journal_name: ".publication-title a.anchor-secondary"
+  volume_issue: ".publication-volume .text-xs a.anchor-primary"
+  article_type: ".article-dochead span"
+  license_info: ".LicenseInfo .License a.anchor-primary"
+  access_status: ".LicenseInfo .AccessLabel"
+  citation_count: ".plumX-metrics .metric-title-citations + ul li span:last-child"
+  mendeley_readers: ".plumX-metrics .metric-title-captures + ul li span:last-child"
+  funding_info: ".Footnotes .footnote-detail #ntpara0010"
+  conflicts_of_interest: ".Footnotes .footnote-detail #ntpara0015"
+  copyright: ".Copyright .copyright-line"

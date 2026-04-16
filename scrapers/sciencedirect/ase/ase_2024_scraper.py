@@ -31,15 +31,15 @@ class Driver:
         self.options.add_argument("--window-size=1280,800")
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--disable-dev-shm-usage")
-        
+
         # Speed optimizations: don't wait for full page load and block heavy resources
-        self.options.page_load_strategy = 'eager'
+        self.options.page_load_strategy = "eager"
         prefs = {
             "profile.managed_default_content_settings.images": 2,
             "profile.managed_default_content_settings.fonts": 2,
         }
         self.options.add_experimental_option("prefs", prefs)
-        
+
         try:
             self.driver = uc.Chrome(options=self.options)
         except Exception as e:
@@ -112,7 +112,7 @@ class ScrapAbstractsLinks:
         # Remove duplicates while preserving order
         unique_articles = list(dict.fromkeys(self.all_articles))
         duplicate_count = len(self.all_articles) - len(unique_articles)
-        
+
         if duplicate_count > 0:
             logger.info(f"Removed {duplicate_count} duplicate links.")
 
@@ -121,9 +121,7 @@ class ScrapAbstractsLinks:
             os.makedirs(os.path.dirname(FILE_NAME), exist_ok=True)
             with open(FILE_NAME, "w", encoding="utf-8") as f:
                 json.dump(unique_articles, f, indent=4, ensure_ascii=False)
-            logger.success(
-                f"Saved {len(unique_articles)} article links to {FILE_NAME}"
-            )
+            logger.success(f"Saved {len(unique_articles)} article links to {FILE_NAME}")
         except Exception as e:
             logger.error(f"Failed to save results to {FILE_NAME}: {e}")
 
@@ -149,6 +147,98 @@ class ScrapAbstractsLinks:
         except Exception as e:
             logger.critical(f"Critical error in scraping orchestration: {e}")
 
+
+class ScrapAbstracts:
+    def __init__(self, driver):
+        
+        self.driver = driver
+        self.all_abstracts = []
+
+        self.url = ""
+        self.title = ".Head.u-font-serif.u-h2.u-margin-s-ver #screen-reader-main-title .title-text"
+        self.doi = ".ArticleIdentifierLinks a.doi"
+        self.author_info = ".AuthorGroups .author-group a.anchor-secondary"
+        self.abstract = ".Body #body > div"
+        self.abstract_html = ".Body #body > div"
+        self.abstract_markdown = ".Body #body > div"
+        self.abstract_metadata = {
+
+        }
+
+    def load_page(self, url):
+        """Navigates to the abstract page and waits for content."""
+        logger.info(f"Accessing abstract: {url}")
+        self.driver.get(url)
+
+        # Wait for the main title to be present to indicate page load
+        WebDriverWait(self.driver, 15).until(
+            EC.presence_of_element_located((By.ID, "screen-reader-main-title"))
+        )
+        return BeautifulSoup(self.driver.page_source, "lxml")
+
+    def extract_title(self, soup):
+        """Extracts the abstract title."""
+        title_tag = soup.select_one(self.title)
+        return title_tag.get_text(strip=True) if title_tag else ""
+
+    def extract_author_info(self, soup):
+        """Extracts author information as a single string."""
+        authors = []
+        author_tags = soup.select(self.author_info)
+        for tag in author_tags:
+            authors.append(tag.get_text(strip=True))
+        return ", ".join(authors)
+
+    def extract_abstract_text(self, soup):
+        """Extracts the main body of the abstract in plain text."""
+        abstract_tag = soup.select_one(self.abstract)
+        return abstract_tag.get_text(strip=True) if abstract_tag else "-"
+
+    def extract_abstract_html(self, soup):
+        """Extracts the HTML of the main body of the abstract."""
+        abstract_tag = soup.select_one(self.abstract_html)
+        return str(abstract_tag) if abstract_tag else "-"
+
+    def extract_doi(self, soup):
+        """Extracts the DOI link."""
+        doi_tag = soup.select_one(self.doi)
+        return doi_tag.get("href", "") if doi_tag else ""
+
+    def extract_metadata(self, soup):
+        """
+        Extracts site-specific metadata dynamically based on the selectors
+        provided in self.abstract_metadata.
+        """
+        metadata = {}
+        for key, selector in self.abstract_metadata.items():
+            if selector:
+                tag = soup.select_one(selector)
+                metadata[key] = tag.get_text(strip=True) if tag else ""
+        return metadata
+
+    def process_abstract(self, url, abstract_number=""):
+        """Orchestrates loading the page and returning data formatted per format.json."""
+        try:
+            soup = self.load_page(url)
+
+            data = {
+                "link": url,
+                "title": self.extract_title(soup),
+                "doi": self.extract_doi(soup),
+                "number": abstract_number,  # Placeholder or explicitly passed
+                "author_info": self.extract_author_info(soup),
+                "abstract": self.extract_abstract_text(soup),
+                "abstract_html": self.extract_abstract_html(soup),
+                "abstract_markdown": "",  # Optional: Markdown extraction (if a library is added)
+                "abstract_metadata": self.extract_metadata(soup),
+            }
+
+            self.all_abstracts.append(data)
+            logger.info(f"  [+] Scraped: {data.get('title', '')[:50]}...")
+            return data
+        except Exception as e:
+            logger.error(f"  [!] Failed to scrape abstract {url}: {e}")
+            return None
 
 
 class ASEScraper2024:
