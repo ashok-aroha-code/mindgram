@@ -7,12 +7,12 @@ install:
 run:
 	python main.py -s $(s) -t $(t) -y $(y)
 
-# Named aliases — just: make aes-2025
-aes-2024:
-	python main.py -s sciencedirect -t aes -y 2024
+# Named aliases — just: make ase-2025
+ase-2024:
+	python main.py -s sciencedirect -t ase -y 2024
 
-aes-2025:
-	python main.py -s sciencedirect -t aes -y 2025
+ase-2025:
+	python main.py -s sciencedirect -t ase -y 2025
 
 # Run everything
 all:
