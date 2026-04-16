@@ -110,18 +110,7 @@ class ScrapAbstractsLinks:
 
         except Exception as e:
             logger.critical(f"Critical error in scraping orchestration: {e}")
-        finally:
-            try:
-                if self.driver:
-                    self.driver.quit()
-                    self.driver = None
-                logger.info("Browser session closed.")
-            except Exception as e:
-                # Silence the invalid handle error common on Windows with undetected_chromedriver
-                if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
-                    logger.debug("Silenced WinError 6 during driver shutdown.")
-                else:
-                    logger.warning(f"Error during browser closure: {e}")
+
 
 
 class ASEScraper2024:
