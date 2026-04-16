@@ -40,6 +40,22 @@ class Driver:
     def get_driver(self):
         return self.driver
 
+    def quit(self):
+        """Safely closes the browser and silences WinError 6."""
+        if hasattr(self, "driver") and self.driver:
+            logger.info("Closing browser session...")
+            try:
+                self.driver.quit()
+                self.driver = None
+            except Exception as e:
+                # Silence WinError 6 (The handle is invalid) which is common on Windows with undetected_chromedriver
+                if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
+                    logger.debug("Silenced WinError 6 during driver shutdown.")
+                else:
+                    logger.warning(f"Error during browser closure: {e}")
+            finally:
+                logger.info("Browser session closed.")
+
 
 class ScrapAbstractsLinks:
     def __init__(self, driver):
@@ -132,6 +148,9 @@ class ASEScraper2024:
             logger.info("ASEScraper2024 run completed.")
         except Exception as e:
             logger.error(f"ASEScraper2024 task failed: {e}")
+        finally:
+            if "driver_wrapper" in locals():
+                driver_wrapper.quit()
 
 
 if __name__ == "__main__":
