@@ -73,18 +73,25 @@ class ScrapAbstractsLinks:
         return count
 
     def save_results(self):
-        """Saves all collected articles to a JSON file."""
+        """Saves all collected articles to a JSON file, removing duplicates."""
         if not self.all_articles:
             logger.warning("No article links collected to save.")
             return
+
+        # Remove duplicates while preserving order
+        unique_articles = list(dict.fromkeys(self.all_articles))
+        duplicate_count = len(self.all_articles) - len(unique_articles)
+        
+        if duplicate_count > 0:
+            logger.info(f"Removed {duplicate_count} duplicate links.")
 
         try:
             # Ensure the directory exists before saving
             os.makedirs(os.path.dirname(FILE_NAME), exist_ok=True)
             with open(FILE_NAME, "w", encoding="utf-8") as f:
-                json.dump(self.all_articles, f, indent=4, ensure_ascii=False)
+                json.dump(unique_articles, f, indent=4, ensure_ascii=False)
             logger.success(
-                f"Saved {len(self.all_articles)} article links to {FILE_NAME}"
+                f"Saved {len(unique_articles)} article links to {FILE_NAME}"
             )
         except Exception as e:
             logger.error(f"Failed to save results to {FILE_NAME}: {e}")
