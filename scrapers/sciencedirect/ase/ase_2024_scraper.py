@@ -4,7 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from loguru import logger
-import json, time, random, sys
+import json, time, random, sys, os
 
 # Configure Loguru
 logger.remove()
@@ -21,7 +21,7 @@ logger.add(
     level="DEBUG",
 )
 
-FILE_NAME = "ase_2024_links.json"
+FILE_NAME = os.path.join("data", "sciencedirect", "ase_2024", "ase_2024_links.json")
 BASE_URL = "https://www.sciencedirect.com/journal/journal-of-the-american-society-of-echocardiography/vol/37/issue"
 
 
@@ -79,6 +79,8 @@ class ScrapAbstractsLinks:
             return
 
         try:
+            # Ensure the directory exists before saving
+            os.makedirs(os.path.dirname(FILE_NAME), exist_ok=True)
             with open(FILE_NAME, "w", encoding="utf-8") as f:
                 json.dump(self.all_articles, f, indent=4, ensure_ascii=False)
             logger.success(
@@ -109,8 +111,17 @@ class ScrapAbstractsLinks:
         except Exception as e:
             logger.critical(f"Critical error in scraping orchestration: {e}")
         finally:
-            self.driver.quit()
-            logger.info("Browser session closed.")
+            try:
+                if self.driver:
+                    self.driver.quit()
+                    self.driver = None
+                logger.info("Browser session closed.")
+            except Exception as e:
+                # Silence the invalid handle error common on Windows with undetected_chromedriver
+                if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
+                    logger.debug("Silenced WinError 6 during driver shutdown.")
+                else:
+                    logger.warning(f"Error during browser closure: {e}")
 
 
 class ASEScraper2024:
