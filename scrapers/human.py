@@ -9,127 +9,119 @@ class HumanBehaviors:
         self.driver = driver
 
     def scroll_randomly(self, driver=None):
-        """Scrolls the page randomly to simulate reading."""
+        """Scrolls a random section of the page quickly to simulate 'scanning'."""
         driver = driver or self.driver
         if not driver:
-            logger.error("No driver provided to scroll_randomly")
             return
             
         try:
-            scroll_height = driver.execute_script("return document.body.scrollHeight")
             viewport_height = driver.execute_script("return window.innerHeight")
-            current_scroll = 0
+            # Only scroll a random 30-50% of the page height to save time
+            total_height = driver.execute_script("return document.body.scrollHeight")
+            max_scroll = min(total_height, random.randint(viewport_height, total_height // 2))
             
-            # Scroll down in increments
-            while current_scroll < scroll_height:
-                step = random.randint(200, viewport_height // 2)
+            current_scroll = 0
+            while current_scroll < max_scroll:
+                # Larger, faster steps
+                step = random.randint(300, 600)
                 current_scroll += step
                 driver.execute_script(f"window.scrollTo(0, {current_scroll});")
-                time.sleep(random.uniform(0.5, 1.5))
+                time.sleep(random.uniform(0.3, 0.7)) # Faster pause
                 
-                # Occasionally scroll back up a bit
-                if random.random() < 0.2:
-                    back_step = random.randint(50, 150)
-                    current_scroll -= back_step
+                if random.random() < 0.1: # Less frequent backtracking
+                    current_scroll -= random.randint(50, 100)
                     driver.execute_script(f"window.scrollTo(0, {current_scroll});")
-                    time.sleep(random.uniform(0.2, 0.5))
-                
-                # Re-check height in case of lazy loading
-                scroll_height = driver.execute_script("return document.body.scrollHeight")
-                if current_scroll > scroll_height:
-                    break
-            logger.debug("Finished random scrolling.")
+                    time.sleep(0.2)
+            
+            logger.debug("Finished quick random scroll.")
         except Exception as e:
-            logger.warning(f"Scroll failed: {e}")
+            logger.debug(f"Scroll skipped: {e}")
 
     def mouse_move(self, driver=None):
-        """Moves the mouse to random visible elements to simulate user focus."""
+        """Moves the mouse to 1-2 random visible elements quickly."""
         driver = driver or self.driver
         if not driver:
-            logger.error("No driver provided to mouse_move")
             return
 
         try:
-            # Find common visible tags
             elements = driver.find_elements(By.XPATH, "//*[self::div or self::span or self::a or self::p]")
             visible_elements = [e for e in elements if e.is_displayed()]
             
             if not visible_elements:
                 return
             
-            # Select 2-4 random elements to hover over
-            targets = random.sample(visible_elements, min(len(visible_elements), random.randint(2, 4)))
+            # Select only 1-2 random elements
+            targets = random.sample(visible_elements, min(len(visible_elements), random.randint(1, 2)))
             actions = ActionChains(driver)
             
             for target in targets:
                 try:
-                    actions.move_to_element(target).pause(random.uniform(0.2, 0.6))
+                    actions.move_to_element(target).pause(random.uniform(0.1, 0.3))
                 except:
                     continue
             
             actions.perform()
-            logger.debug(f"Simulated mouse movement over {len(targets)} elements.")
+            logger.debug(f"Quick mouse move over {len(targets)} elements.")
         except Exception as e:
-            logger.debug(f"Mouse move simulation skipped: {e}")
+            logger.debug(f"Mouse move skipped: {e}")
 
     def type_randomly(self, element, text):
-        """Types text into an element char by char with random human-like delays."""
+        """Types text with fast, slight variable delays."""
         try:
             for char in text:
                 element.send_keys(char)
-                time.sleep(random.uniform(0.05, 0.2))
-            logger.debug(f"Physically typed {len(text)} characters.")
+                time.sleep(random.uniform(0.02, 0.1)) # Faster typing
+            logger.debug(f"Fast typed {len(text)} characters.")
         except Exception as e:
-            logger.error(f"Typing simulation failed: {e}")
+            logger.debug(f"Typing skipped: {e}")
 
     def click_randomly(self, driver=None):
-        """Clicks a random safe element (like a div or span) to simulate interaction."""
+        """Clicks a random safe element quickly."""
         driver = driver or self.driver
         if not driver:
-            logger.error("No driver provided to click_randomly")
             return
 
         try:
-            elements = driver.find_elements(By.CSS_SELECTOR, "div, span, section")
-            visible_elements = [e for e in elements if e.is_displayed() and e.size.get('width') > 0]
+            elements = driver.find_elements(By.CSS_SELECTOR, "div, span")
+            visible_elements = [e for e in elements if e.is_displayed() and e.size.get('width', 0) > 0]
             
             if not visible_elements:
                 return
                 
             target = random.choice(visible_elements)
-            # Use ActionChains to move and click (more human-like than .click())
             actions = ActionChains(driver)
-            actions.move_to_element(target).pause(random.uniform(0.1, 0.4)).click().perform()
-            logger.debug("Performed a simulated random click.")
+            actions.move_to_element(target).click().perform()
+            logger.debug("Performed a quick random click.")
         except Exception as e:
-            logger.debug(f"Random click simulation skipped: {e}")
+            logger.debug(f"Click skipped: {e}")
 
-    def wait_randomly(self, min_wait=1.0, max_wait=3.5):
-        """Pauses execution for a random duration."""
+    def wait_randomly(self, min_wait=0.5, max_wait=2.0):
+        """Short random pause."""
         duration = random.uniform(min_wait, max_wait)
-        logger.debug(f"Waiting for {duration:.2f}s...")
         time.sleep(duration)
 
-    def humanize(self, driver=None):
+    def humanize(self, driver=None, probability=0.2):
         """
-        Orchestrates multiple random behaviors.
-        Useful when arriving on a new page or after a significant action.
+        Orchestrates 1-2 random behaviors with a chance of execution (default 20%).
+        This ensures high scraping speed while maintaining enough variability.
         """
+        if random.random() > probability:
+            return
+
         driver = driver or self.driver
         if not driver:
-            logger.error("No driver provided to humanize")
             return
 
         behaviors = [
             lambda: self.scroll_randomly(driver),
             lambda: self.mouse_move(driver),
-            lambda: self.wait_randomly(1, 2),
+            lambda: self.wait_randomly(0.5, 1.5),
             lambda: self.click_randomly(driver)
         ]
         
-        # Pick 2-3 random behaviors to execute
-        to_run = random.sample(behaviors, random.randint(2, 3))
-        logger.info(f"Humanizing session with {len(to_run)} actions...")
+        # Pick 1-2 random behaviors to execute
+        to_run = random.sample(behaviors, random.randint(1, 2))
+        logger.info(f"Humanizing session (probabilistic) with {len(to_run)} quick actions...")
         for behavior in to_run:
             try:
                 behavior()

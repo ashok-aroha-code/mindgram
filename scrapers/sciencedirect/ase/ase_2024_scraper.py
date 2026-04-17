@@ -251,7 +251,7 @@ class ScrapAbstracts:
         """Clicks 'show more' to reveal affiliations and extracts them."""
         # Use a string selector for safe_click
         selector = "#show-more-btn"
-        
+
         # Check if button exists first to avoid unnecessary waiting
         if not soup.select_one(selector):
             affiliations = soup.select("dl.affiliation")
@@ -260,7 +260,7 @@ class ScrapAbstracts:
 
         # If the click is successful, we refresh our soup to see new content
         if utils.safe_click(self.driver, selector, timeout=5):
-            time.sleep(1) # Wait for animation/loading
+            time.sleep(1)  # Wait for animation/loading
             soup = BeautifulSoup(self.driver.page_source, "lxml")
 
         affiliations = soup.select("dl.affiliation")
@@ -280,9 +280,12 @@ class ScrapAbstracts:
         return str(abstract_tag) if abstract_tag else "-"
 
     def extract_doi(self, soup):
-        """Extracts the DOI link."""
+        """Extracts the DOI link, removing the protocol and domain prefix."""
         doi_tag = soup.select_one(self.doi)
-        return doi_tag.get("href", "") if doi_tag else ""
+        if not doi_tag:
+            return ""
+        href = doi_tag.get("href", "")
+        return re.sub(r"https?://doi\.org/", "", href)
 
     def extract_metadata(self, soup):
         """
@@ -309,7 +312,11 @@ class ScrapAbstracts:
                 "title": self.extract_title(soup),
                 "doi": self.extract_doi(soup),
                 "number": abstract_number,  # Placeholder or explicitly passed
-                "author_info": f"{author_info} -- Affiliations: {affiliations}" if affiliations else author_info,
+                "author_info": (
+                    f"{author_info} -- Affiliations: {affiliations}"
+                    if affiliations
+                    else author_info
+                ),
                 "abstract": self.extract_abstract_text(soup),
                 "abstract_html": self.extract_abstract_html(soup),
                 "abstract_markdown": "",  # Optional: Markdown extraction (if a library is added)
