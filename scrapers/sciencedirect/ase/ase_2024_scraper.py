@@ -280,15 +280,18 @@ class ScrapAbstracts:
         abstract_tag = soup.select_one(self.abstract)
         if not abstract_tag:
             return "-"
-            
+
         # Use two newlines to separate sections (Background, Methods, etc.)
         text = abstract_tag.get_text(separator="\n\n", strip=True)
-        
+
         # Clean up bullet point artifacts as requested
-        text = text.replace("\n\n•\n\n", " • ")
-        text = text.replace("\n•\n", " • ")
-        
-        return text
+        text = text.replace("\n\n•\n\n", " ")
+        text = text.replace("\n•\n", " ")
+
+        # Collapse multiple horizontal spaces into one
+        text = re.sub(r' +', ' ', text)
+
+        return text.strip()
 
     def extract_abstract_html(self, soup):
         """Extracts the HTML of the main body of the abstract."""
