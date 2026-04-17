@@ -187,7 +187,9 @@ class ScrapAbstracts:
 
         self.url = ""
         self.title = "#screen-reader-main-title > span"
-        self.doi = "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
+        self.doi = (
+            "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
+        )
         self.author_info = "#banner > div.wrapper.truncated > div.AuthorGroups"
         self.affiliation = ""
         self.abstract = "#abstracts"
@@ -210,7 +212,9 @@ class ScrapAbstracts:
     def extract_title(self, soup):
         """Extracts the abstract title."""
         title_tag = soup.select_one(self.title)
-        return title_tag.get_text(strip=True) if title_tag else ""
+        title = title_tag.get_text(strip=True) if title_tag else ""
+        logger.info(f"  [+] Scraped Title: {title}")
+        return title
 
     def extract_author_info(self, soup):
         """Extracts author information as a single string."""
@@ -375,7 +379,7 @@ class ASEScraper2024:
                 }
                 existing_links = set()
 
-            #sample
+            # sample
             for index, link in enumerate(links[:5], start=1):
                 # Skip if already in the final structure
                 if link in existing_links:
