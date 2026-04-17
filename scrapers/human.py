@@ -18,7 +18,7 @@ class HumanBehaviors:
             viewport_height = driver.execute_script("return window.innerHeight")
             # Only scroll a random 30-50% of the page height to save time
             total_height = driver.execute_script("return document.body.scrollHeight")
-            max_scroll = min(total_height, random.randint(viewport_height, total_height // 2))
+            max_scroll = min(total_height, random.randint(viewport_height, total_height // 4))
             
             current_scroll = 0
             while current_scroll < max_scroll:
