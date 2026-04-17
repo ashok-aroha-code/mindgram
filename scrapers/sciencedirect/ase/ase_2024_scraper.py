@@ -4,7 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from loguru import logger
-from scrapers import utils
+from scrapers import utils, HumanBehaviors
 
 import json, time, random, sys, os
 import re
@@ -105,6 +105,7 @@ class Driver:
 class ScrapAbstractsLinks:
     def __init__(self, driver):
         self.driver = driver
+        self.hb = HumanBehaviors(driver)
         self.all_articles = []
 
     def fetch_issue_page(self, page_num):
@@ -116,6 +117,7 @@ class ScrapAbstractsLinks:
         WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.CLASS_NAME, "article-content-title"))
         )
+        self.hb.humanize()
 
     def extract_links(self, page_num):
         """Parses the current page source and extracts article links."""
@@ -181,6 +183,7 @@ class ScrapAbstracts:
     def __init__(self, driver):
 
         self.driver = driver
+        self.hb = HumanBehaviors(driver)
 
         self.url = ""
         self.title = "#screen-reader-main-title > span"
@@ -203,6 +206,7 @@ class ScrapAbstracts:
         WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.ID, "screen-reader-main-title"))
         )
+        self.hb.humanize()
         return BeautifulSoup(self.driver.page_source, "lxml")
 
     def extract_title(self, soup):
@@ -379,10 +383,8 @@ class ASEScraper2024:
                     # Incremental save to prevent data loss
                     save_json(final_data, ABSTRACT_FILE_NAME)
 
-                    # Random delay between abstract pages
-                    delay = random.uniform(2.0, 4.5)
-                    logger.debug(f"Sleeping for {delay:.2f}s before next abstract...")
-                    time.sleep(delay)
+                    # Human-like delay between abstract pages
+                    abstract_scraper.hb.wait_randomly(2.0, 5.0)
 
             logger.info(
                 f"ASEScraper2024 run completed. {len(final_data['abstracts'])} abstracts saved."

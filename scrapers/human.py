@@ -5,11 +5,16 @@ from selenium.webdriver.common.by import By
 from loguru import logger
 
 class HumanBehaviors:
-    def __init__(self):
-        pass
+    def __init__(self, driver=None):
+        self.driver = driver
 
-    def scroll_randomly(self, driver):
+    def scroll_randomly(self, driver=None):
         """Scrolls the page randomly to simulate reading."""
+        driver = driver or self.driver
+        if not driver:
+            logger.error("No driver provided to scroll_randomly")
+            return
+            
         try:
             scroll_height = driver.execute_script("return document.body.scrollHeight")
             viewport_height = driver.execute_script("return window.innerHeight")
@@ -37,8 +42,13 @@ class HumanBehaviors:
         except Exception as e:
             logger.warning(f"Scroll failed: {e}")
 
-    def mouse_move(self, driver):
+    def mouse_move(self, driver=None):
         """Moves the mouse to random visible elements to simulate user focus."""
+        driver = driver or self.driver
+        if not driver:
+            logger.error("No driver provided to mouse_move")
+            return
+
         try:
             # Find common visible tags
             elements = driver.find_elements(By.XPATH, "//*[self::div or self::span or self::a or self::p]")
@@ -72,8 +82,13 @@ class HumanBehaviors:
         except Exception as e:
             logger.error(f"Typing simulation failed: {e}")
 
-    def click_randomly(self, driver):
+    def click_randomly(self, driver=None):
         """Clicks a random safe element (like a div or span) to simulate interaction."""
+        driver = driver or self.driver
+        if not driver:
+            logger.error("No driver provided to click_randomly")
+            return
+
         try:
             elements = driver.find_elements(By.CSS_SELECTOR, "div, span, section")
             visible_elements = [e for e in elements if e.is_displayed() and e.size.get('width') > 0]
@@ -95,11 +110,16 @@ class HumanBehaviors:
         logger.debug(f"Waiting for {duration:.2f}s...")
         time.sleep(duration)
 
-    def humanize(self, driver):
+    def humanize(self, driver=None):
         """
         Orchestrates multiple random behaviors.
         Useful when arriving on a new page or after a significant action.
         """
+        driver = driver or self.driver
+        if not driver:
+            logger.error("No driver provided to humanize")
+            return
+
         behaviors = [
             lambda: self.scroll_randomly(driver),
             lambda: self.mouse_move(driver),
