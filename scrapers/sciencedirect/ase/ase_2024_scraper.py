@@ -213,34 +213,34 @@ class ScrapAbstracts:
 
     def extract_author_info(self, soup):
         """Extracts author information as a single string."""
-        authors = []
         processed_authors = []
+        # Select the main container for authors
+        author_groups = soup.select(".AuthorGroups")
+        if not author_groups:
+            logger.debug("  [!] No AuthorGroups container found.")
+            return ""
 
-        author_group_tags = soup.select(self.author_info)
-        logger.info(f"  [+] Scraped: {author_group_tags}")
-
-        for group_tag in author_group_tags:
-            a
-            uthor_name_tags = group_tag.select(
-                "#author-group > a:nth-child(2) > span > span > span.react-xocs-alternative-link"
-            )
-            logger.info(f"  [+] Scraped: {author_name_tags}")
-
-            author_ref_tags = group_tag.select("#baff1")
-            logger.info(f"  [+] Scraped: {author_ref_tags}")
-
-            author_ref_list = []
+        for group in author_groups:
+            # Find all author buttons/links
+            # The HTML shows authors are inside buttons with class 'button-link'
+            author_tags = group.select(".author-group button, .author-group a")
             
-            for ref in author_ref_tags:
-                ref_text = ref.get_text(strip=True)
-                author_ref_list.append(ref_text)
-
-            author_ref_str = " ".join(author_ref_list)
-
-            for author_name_tag in author_name_tags:
-                author_name = author_name_tag.get_text(strip=True)
-                processed_authors.append(f"{author_name} {author_ref_str}")
-                logger.info(f"  [+] Scraped: {author_name} {author_ref_str}")
+            for tag in author_tags:
+                # Extract author name
+                name_tag = tag.select_one(".react-xocs-alternative-link")
+                if not name_tag:
+                    continue
+                
+                name = name_tag.get_text(" ", strip=True)
+                
+                # Extract references (affiliations)
+                ref_tags = tag.select(".author-ref")
+                refs = [ref.get_text(strip=True) for ref in ref_tags]
+                ref_str = " ".join(refs)
+                
+                author_str = f"{name} {ref_str}".strip()
+                processed_authors.append(author_str)
+                logger.info(f"  [+] Scraped Author: {author_str}")
 
         return ", ".join(processed_authors)
 
