@@ -187,7 +187,7 @@ class ScrapAbstracts:
 
         self.url = ""
         self.title = "#screen-reader-main-title > span"
-        self.doi = "#span.anchor-text"
+        self.doi = "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
         self.author_info = "#banner > div.wrapper.truncated > div.AuthorGroups"
         self.affiliation = ""
         self.abstract = "#abstracts"
@@ -278,12 +278,13 @@ class ScrapAbstracts:
         return str(abstract_tag) if abstract_tag else "-"
 
     def extract_doi(self, soup):
-        """Extracts the DOI link, removing the protocol and domain prefix."""
+        """Extracts the DOI link from text content, removing the protocol and domain prefix."""
         doi_tag = soup.select_one(self.doi)
         if not doi_tag:
             return ""
-        href = doi_tag.get("href", "")
-        return re.sub(r"https?://doi\.org/", "", href)
+        # The DOI is contained in the text of the span element
+        text_content = doi_tag.get_text(strip=True)
+        return re.sub(r"https?://doi\.org/", "", text_content)
 
     def extract_metadata(self, soup):
         """
