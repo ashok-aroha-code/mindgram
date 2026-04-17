@@ -5,6 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from loguru import logger
 import json, time, random, sys, os
+import re
 
 # Configure Loguru
 logger.remove()
@@ -187,7 +188,7 @@ class ScrapAbstracts:
         self.doi = (
             "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
         )
-        self.author_info = "#author-group"
+        self.author_info = "#banner > div.wrapper.truncated > div.AuthorGroups"
         self.affiliation = ""
         self.abstract = "#abstracts"
         self.abstract_html = "#abstracts"
@@ -213,10 +214,35 @@ class ScrapAbstracts:
     def extract_author_info(self, soup):
         """Extracts author information as a single string."""
         authors = []
-        author_tags = soup.select(self.author_info)
-        for tag in author_tags:
-            authors.append(tag.get_text(strip=True))
-        return ", ".join(authors)
+        processed_authors = []
+
+        author_group_tags = soup.select(self.author_info)
+        logger.info(f"  [+] Scraped: {author_group_tags}")
+
+        for group_tag in author_group_tags:
+            a
+            uthor_name_tags = group_tag.select(
+                "#author-group > a:nth-child(2) > span > span > span.react-xocs-alternative-link"
+            )
+            logger.info(f"  [+] Scraped: {author_name_tags}")
+
+            author_ref_tags = group_tag.select("#baff1")
+            logger.info(f"  [+] Scraped: {author_ref_tags}")
+
+            author_ref_list = []
+            
+            for ref in author_ref_tags:
+                ref_text = ref.get_text(strip=True)
+                author_ref_list.append(ref_text)
+
+            author_ref_str = " ".join(author_ref_list)
+
+            for author_name_tag in author_name_tags:
+                author_name = author_name_tag.get_text(strip=True)
+                processed_authors.append(f"{author_name} {author_ref_str}")
+                logger.info(f"  [+] Scraped: {author_name} {author_ref_str}")
+
+        return ", ".join(processed_authors)
 
     def extract_abstract_text(self, soup):
         """Extracts the main body of the abstract in plain text."""
