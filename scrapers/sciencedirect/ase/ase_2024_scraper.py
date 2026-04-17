@@ -4,7 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from loguru import logger
-from scrapers import utils, HumanBehaviors
+from scrapers import utils, HumanBehaviors, ScraperTimer
 
 import json, time, random, sys, os
 import re
@@ -357,6 +357,7 @@ class ASEScraper2024:
 
     def run(self):
         """Orchestrates the full scraping run."""
+        timer = ScraperTimer().start()
         logger.info("Starting ASEScraper2024 full run...")
         try:
             driver_wrapper = Driver()
@@ -415,7 +416,8 @@ class ASEScraper2024:
                     abstract_scraper.hb.wait_randomly(2.0, 5.0)
 
             logger.info(
-                f"ASEScraper2024 run completed. {len(final_data['abstracts'])} abstracts saved."
+                f"ASEScraper2024 run completed. {len(final_data['abstracts'])} abstracts saved. "
+                f"Total time: {timer.format_elapsed()}"
             )
         except Exception as e:
             logger.error(f"ASEScraper2024 task failed: {e}")
