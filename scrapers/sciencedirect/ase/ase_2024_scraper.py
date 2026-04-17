@@ -21,8 +21,35 @@ logger.add(
     level="DEBUG",
 )
 
-FILE_NAME = os.path.join("data", "sciencedirect", "ase_2024", "ase_2024_links.json")
+LINK_FILE_NAME = os.path.join(
+    "data", "sciencedirect", "ase_2024", "ase_2024_links.json"
+)
+ABSTRACT_FILE_NAME = os.path.join(
+    "data", "sciencedirect", "ase_2024", "ase_2024_abstracts.json"
+)
 BASE_URL = "https://www.sciencedirect.com/journal/journal-of-the-american-society-of-echocardiography/vol/37/issue"
+
+
+def load_json(file_path):
+    """Safely loads data from a JSON file."""
+    if not os.path.exists(file_path):
+        return []
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load JSON from {file_path}: {e}")
+        return []
+
+
+def save_json(data, file_path):
+    """Saves data to a JSON file with pretty formatting."""
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Failed to save JSON to {file_path}: {e}")
 
 
 class Driver:
@@ -118,12 +145,14 @@ class ScrapAbstractsLinks:
 
         try:
             # Ensure the directory exists before saving
-            os.makedirs(os.path.dirname(FILE_NAME), exist_ok=True)
-            with open(FILE_NAME, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(LINK_FILE_NAME), exist_ok=True)
+            with open(LINK_FILE_NAME, "w", encoding="utf-8") as f:
                 json.dump(unique_articles, f, indent=4, ensure_ascii=False)
-            logger.success(f"Saved {len(unique_articles)} article links to {FILE_NAME}")
+            logger.success(
+                f"Saved {len(unique_articles)} article links to {LINK_FILE_NAME}"
+            )
         except Exception as e:
-            logger.error(f"Failed to save results to {FILE_NAME}: {e}")
+            logger.error(f"Failed to save results to {LINK_FILE_NAME}: {e}")
 
     def scrape_all_issues(self, start_page, end_page):
         """Orchestrates the scraping of multiple issues."""
@@ -150,20 +179,20 @@ class ScrapAbstractsLinks:
 
 class ScrapAbstracts:
     def __init__(self, driver):
-        
+
         self.driver = driver
-        self.all_abstracts = []
 
         self.url = ""
-        self.title = ".Head.u-font-serif.u-h2.u-margin-s-ver #screen-reader-main-title .title-text"
-        self.doi = ".ArticleIdentifierLinks a.doi"
-        self.author_info = ".AuthorGroups .author-group a.anchor-secondary"
+        self.title = "#screen-reader-main-title > span"
+        self.doi = (
+            "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
+        )
+        self.author_info = "#banner > div.wrapper.truncated > div.AuthorGroups"
+        self.affiliation = ""
         self.abstract = ".Body #body > div"
         self.abstract_html = ".Body #body > div"
         self.abstract_markdown = ".Body #body > div"
-        self.abstract_metadata = {
-
-        }
+        self.abstract_metadata = {}
 
     def load_page(self, url):
         """Navigates to the abstract page and waits for content."""
@@ -233,7 +262,6 @@ class ScrapAbstracts:
                 "abstract_metadata": self.extract_metadata(soup),
             }
 
-            self.all_abstracts.append(data)
             logger.info(f"  [+] Scraped: {data.get('title', '')[:50]}...")
             return data
         except Exception as e:
@@ -242,15 +270,72 @@ class ScrapAbstracts:
 
 
 class ASEScraper2024:
+
+    def __init__(self):
+        self.all_abstracts = []
+
     def run(self):
-        logger.info("Starting ASEScraper2024 run...")
+        """Orchestrates the full scraping run."""
+        logger.info("Starting ASEScraper2024 full run...")
         try:
             driver_wrapper = Driver()
             driver = driver_wrapper.get_driver()
 
-            scraper = ScrapAbstractsLinks(driver)
-            scraper.scrape_all_issues(1, 12)
-            logger.info("ASEScraper2024 run completed.")
+            # Step 1: Collect All Links (if not already done)
+            if not os.path.exists(LINK_FILE_NAME):
+                link_scraper = ScrapAbstractsLinks(driver)
+                link_scraper.scrape_all_issues(1, 12)
+            else:
+                logger.info("Links file already exists. Skipping step 1.")
+
+            # Step 2: Load Links and Scrape Abstracts
+            links = load_json(LINK_FILE_NAME)
+            if not links:
+                logger.error("No links found to scrape abstracts.")
+                return
+
+            abstract_scraper = ScrapAbstracts(driver)
+
+            # Prepare final structure with resume logic
+            if os.path.exists(ABSTRACT_FILE_NAME):
+                final_data = load_json(ABSTRACT_FILE_NAME)
+                existing_links = {
+                    a.get("link") for a in final_data.get("abstracts", [])
+                }
+                logger.info(
+                    f"Loaded {len(existing_links)} existing abstracts. Resuming..."
+                )
+            else:
+                final_data = {
+                    "meeting_name": "ASE 2024",
+                    "date": "2024",
+                    "link": BASE_URL.rsplit("/", 2)[0],  # Root journal link
+                    "abstracts": [],
+                }
+                existing_links = set()
+
+            for index, link in enumerate(links[0:10], start=1):
+                # Skip if already in the final structure
+                if link in existing_links:
+                    logger.info(f"  [-] Skipping already scraped abstract: {link}")
+                    continue
+
+                abstract_data = abstract_scraper.process_abstract(
+                    link, abstract_number=str(index)
+                )
+                if abstract_data:
+                    final_data["abstracts"].append(abstract_data)
+                    # Incremental save to prevent data loss
+                    save_json(final_data, ABSTRACT_FILE_NAME)
+
+                    # Random delay between abstract pages
+                    delay = random.uniform(2.0, 4.5)
+                    logger.debug(f"Sleeping for {delay:.2f}s before next abstract...")
+                    time.sleep(delay)
+
+            logger.info(
+                f"ASEScraper2024 run completed. {len(final_data['abstracts'])} abstracts saved."
+            )
         except Exception as e:
             logger.error(f"ASEScraper2024 task failed: {e}")
         finally:
