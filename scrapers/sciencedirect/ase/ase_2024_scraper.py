@@ -4,6 +4,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from loguru import logger
+from scrapers import utils
+
 import json, time, random, sys, os
 import re
 
@@ -145,10 +147,7 @@ class ScrapAbstractsLinks:
             logger.info(f"Removed {duplicate_count} duplicate links.")
 
         try:
-            # Ensure the directory exists before saving
-            os.makedirs(os.path.dirname(LINK_FILE_NAME), exist_ok=True)
-            with open(LINK_FILE_NAME, "w", encoding="utf-8") as f:
-                json.dump(unique_articles, f, indent=4, ensure_ascii=False)
+            save_json(unique_articles, LINK_FILE_NAME)
             logger.success(
                 f"Saved {len(unique_articles)} article links to {LINK_FILE_NAME}"
             )
@@ -224,25 +223,47 @@ class ScrapAbstracts:
             # Find all author buttons/links
             # The HTML shows authors are inside buttons with class 'button-link'
             author_tags = group.select(".author-group button, .author-group a")
-            
+
             for tag in author_tags:
                 # Extract author name
                 name_tag = tag.select_one(".react-xocs-alternative-link")
                 if not name_tag:
                     continue
-                
+
                 name = name_tag.get_text(" ", strip=True)
-                
+
                 # Extract references (affiliations)
                 ref_tags = tag.select(".author-ref")
                 refs = [ref.get_text(strip=True) for ref in ref_tags]
                 ref_str = " ".join(refs)
-                
+
                 author_str = f"{name} {ref_str}".strip()
                 processed_authors.append(author_str)
                 logger.info(f"  [+] Scraped Author: {author_str}")
 
         return ", ".join(processed_authors)
+
+    def extract_author_affiliation(self, soup):
+        """Clicks 'show more' to reveal affiliations and extracts them."""
+        # Use a string selector for safe_click
+        selector = "#show-more-btn"
+        
+        # Check if button exists first to avoid unnecessary waiting
+        if not soup.select_one(selector):
+            affiliations = soup.select("dl.affiliation")
+            affiliation_list = [aff.get_text(strip=True) for aff in affiliations]
+            return " | ".join(affiliation_list) if affiliation_list else ""
+
+        # If the click is successful, we refresh our soup to see new content
+        if utils.safe_click(self.driver, selector, timeout=5):
+            time.sleep(1) # Wait for animation/loading
+            soup = BeautifulSoup(self.driver.page_source, "lxml")
+
+        affiliations = soup.select("dl.affiliation")
+        affiliation_list = [aff.get_text(strip=True) for aff in affiliations]
+
+        # Return as a clean, joined string
+        return " | ".join(affiliation_list) if affiliation_list else ""
 
     def extract_abstract_text(self, soup):
         """Extracts the main body of the abstract in plain text."""
@@ -276,12 +297,15 @@ class ScrapAbstracts:
         try:
             soup = self.load_page(url)
 
+            author_info = self.extract_author_info(soup)
+            affiliations = self.extract_author_affiliation(soup)
+
             data = {
                 "link": url,
                 "title": self.extract_title(soup),
                 "doi": self.extract_doi(soup),
                 "number": abstract_number,  # Placeholder or explicitly passed
-                "author_info": self.extract_author_info(soup),
+                "author_info": f"{author_info} -- Affiliations: {affiliations}" if affiliations else author_info,
                 "abstract": self.extract_abstract_text(soup),
                 "abstract_html": self.extract_abstract_html(soup),
                 "abstract_markdown": "",  # Optional: Markdown extraction (if a library is added)
@@ -323,8 +347,9 @@ class ASEScraper2024:
             abstract_scraper = ScrapAbstracts(driver)
 
             # Prepare final structure with resume logic
-            if os.path.exists(ABSTRACT_FILE_NAME):
-                final_data = load_json(ABSTRACT_FILE_NAME)
+            loaded_data = load_json(ABSTRACT_FILE_NAME)
+            if loaded_data and isinstance(loaded_data, dict):
+                final_data = loaded_data
                 existing_links = {
                     a.get("link") for a in final_data.get("abstracts", [])
                 }
@@ -340,7 +365,7 @@ class ASEScraper2024:
                 }
                 existing_links = set()
 
-            for index, link in enumerate(links[0:5], start=1):
+            for index, link in enumerate(links, start=1):
                 # Skip if already in the final structure
                 if link in existing_links:
                     logger.info(f"  [-] Skipping already scraped abstract: {link}")
