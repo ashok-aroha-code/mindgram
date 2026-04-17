@@ -187,11 +187,11 @@ class ScrapAbstracts:
         self.doi = (
             "#article-identifier-links > a.anchor.doi.anchor-primary > span > span"
         )
-        self.author_info = "#banner > div.wrapper.truncated > div.AuthorGroups"
+        self.author_info = "#author-group"
         self.affiliation = ""
-        self.abstract = ".Body #body > div"
-        self.abstract_html = ".Body #body > div"
-        self.abstract_markdown = ".Body #body > div"
+        self.abstract = "#abstracts"
+        self.abstract_html = "#abstracts"
+        self.abstract_markdown = ""
         self.abstract_metadata = {}
 
     def load_page(self, url):
@@ -314,7 +314,7 @@ class ASEScraper2024:
                 }
                 existing_links = set()
 
-            for index, link in enumerate(links[0:10], start=1):
+            for index, link in enumerate(links[0:5], start=1):
                 # Skip if already in the final structure
                 if link in existing_links:
                     logger.info(f"  [-] Skipping already scraped abstract: {link}")
