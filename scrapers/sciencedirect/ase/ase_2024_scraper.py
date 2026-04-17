@@ -206,6 +206,10 @@ class ScrapAbstracts:
         WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.ID, "screen-reader-main-title"))
         )
+        
+        # Dismiss cookie banners that may block clicks
+        utils.dismiss_cookie_banner(self.driver)
+        
         self.hb.humanize()
         return BeautifulSoup(self.driver.page_source, "lxml")
 

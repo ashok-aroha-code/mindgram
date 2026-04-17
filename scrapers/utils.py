@@ -53,3 +53,30 @@ def scroll_to_element(driver, element):
     except Exception as e:
         logger.error(f"Failed to scroll to element: {e}")
         return False
+
+def dismiss_cookie_banner(driver, timeout=5):
+    """
+    Attempts to find and click the 'Accept All' or 'Dismiss' button for 
+    cookie consent banners (specifically OneTrust used on ScienceDirect).
+    """
+    # Common selectors for cookie banners
+    selectors = [
+        "#onetrust-accept-btn-handler", # OneTrust (ScienceDirect)
+        ".onetrust-close-btn-handler",
+        "#accept-cookies",
+        "button[aria-label='Accept all cookies']"
+    ]
+    
+    for selector in selectors:
+        try:
+            element = WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+            )
+            element.click()
+            logger.info(f"Successfully dismissed cookie banner using: {selector}")
+            time.sleep(1) # Wait for overlay to fade out
+            return True
+        except:
+            continue
+            
+    return False
