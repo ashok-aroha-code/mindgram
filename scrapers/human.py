@@ -100,10 +100,10 @@ class HumanBehaviors:
         duration = random.uniform(min_wait, max_wait)
         time.sleep(duration)
 
-    def humanize(self, driver=None, probability=0.2):
+    def humanize(self, driver=None, probability=1.0):
         """
-        Orchestrates 1-2 random behaviors with a chance of execution (default 20%).
-        This ensures high scraping speed while maintaining enough variability.
+        Orchestrates 1-2 random behaviors on every call (probability=1.0).
+        Maintains enough variability to avoid detection while ensuring coverage.
         """
         if random.random() > probability:
             return
@@ -121,7 +121,7 @@ class HumanBehaviors:
         
         # Pick 1-2 random behaviors to execute
         to_run = random.sample(behaviors, random.randint(1, 2))
-        logger.info(f"Humanizing session (probabilistic) with {len(to_run)} quick actions...")
+        logger.info(f"Humanizing session (every page) with {len(to_run)} quick actions...")
         for behavior in to_run:
             try:
                 behavior()
