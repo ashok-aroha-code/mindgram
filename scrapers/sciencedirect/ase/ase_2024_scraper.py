@@ -206,10 +206,10 @@ class ScrapAbstracts:
         WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.ID, "screen-reader-main-title"))
         )
-        
+
         # Dismiss cookie banners that may block clicks
         utils.dismiss_cookie_banner(self.driver)
-        
+
         self.hb.humanize()
         return BeautifulSoup(self.driver.page_source, "lxml")
 
@@ -276,9 +276,19 @@ class ScrapAbstracts:
         return " | ".join(affiliation_list) if affiliation_list else ""
 
     def extract_abstract_text(self, soup):
-        """Extracts the main body of the abstract in plain text."""
+        """Extracts the main body of the abstract in plain text with section spacing."""
         abstract_tag = soup.select_one(self.abstract)
-        return abstract_tag.get_text(strip=True) if abstract_tag else "-"
+        if not abstract_tag:
+            return "-"
+            
+        # Use two newlines to separate sections (Background, Methods, etc.)
+        text = abstract_tag.get_text(separator="\n\n", strip=True)
+        
+        # Clean up bullet point artifacts as requested
+        text = text.replace("\n\n•\n\n", " • ")
+        text = text.replace("\n•\n", " • ")
+        
+        return text
 
     def extract_abstract_html(self, soup):
         """Extracts the HTML of the main body of the abstract."""
