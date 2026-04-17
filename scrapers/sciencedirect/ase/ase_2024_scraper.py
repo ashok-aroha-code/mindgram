@@ -261,8 +261,8 @@ class ScrapAbstracts:
         # Check if button exists first to avoid unnecessary waiting
         if not soup.select_one(selector):
             affiliations = soup.select("dl.affiliation")
-            affiliation_list = [aff.get_text(strip=True) for aff in affiliations]
-            return " | ".join(affiliation_list) if affiliation_list else ""
+            affiliation_list = [aff.get_text(" ", strip=True) for aff in affiliations]
+            return " ".join(affiliation_list) if affiliation_list else ""
 
         # If the click is successful, we refresh our soup to see new content
         if utils.safe_click(self.driver, selector, timeout=5):
@@ -270,7 +270,7 @@ class ScrapAbstracts:
             soup = BeautifulSoup(self.driver.page_source, "lxml")
 
         affiliations = soup.select("dl.affiliation")
-        affiliation_list = [aff.get_text(strip=True) for aff in affiliations]
+        affiliation_list = [aff.get_text(" ", strip=True) for aff in affiliations]
 
         # Return as a clean, joined string
         return " | ".join(affiliation_list) if affiliation_list else ""
@@ -289,7 +289,7 @@ class ScrapAbstracts:
         text = text.replace("\n•\n", " ")
 
         # Collapse multiple horizontal spaces into one
-        text = re.sub(r' +', ' ', text)
+        text = re.sub(r" +", " ", text)
 
         return text.strip()
 
