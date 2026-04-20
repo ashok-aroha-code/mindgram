@@ -14,9 +14,8 @@ sys.path.append(str(BASE_DIR))
 
 from utils import save_json
 
-
 BASE_URL = "https://aacrjournals.org/cancerres/issue/86/8_Supplement"
-FILE_PATH = os.path.join(BASE_DIR, "data", "aacr_2026_urls.json")
+FILE_PATH = os.path.join("data", "aacrjournals", "aacr_2026", "aacr_2026_urls.json")
 
 
 class Driver:
