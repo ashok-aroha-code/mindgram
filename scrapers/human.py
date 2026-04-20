@@ -100,9 +100,9 @@ class HumanBehaviors:
         duration = random.uniform(min_wait, max_wait)
         time.sleep(duration)
 
-    def humanize(self, driver=None, probability=1.0):
+    def humanize(self, driver=None, probability=0.4):
         """
-        Orchestrates 1-2 random behaviors on every call (probability=1.0).
+        Orchestrates 1-2 random behaviors on some calls (default probability=0.4).
         Maintains enough variability to avoid detection while ensuring coverage.
         """
         if random.random() > probability:
@@ -121,7 +121,9 @@ class HumanBehaviors:
         
         # Pick 1-2 random behaviors to execute
         to_run = random.sample(behaviors, random.randint(1, 2))
-        logger.info(f"Humanizing session (every page) with {len(to_run)} quick actions...")
+        
+        mode = "every page" if probability >= 1.0 else "randomly"
+        logger.info(f"Humanizing session ({mode}) with {len(to_run)} quick actions...")
         for behavior in to_run:
             try:
                 behavior()

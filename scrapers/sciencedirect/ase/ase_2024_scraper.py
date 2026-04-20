@@ -273,7 +273,7 @@ class ScrapAbstracts:
         affiliation_list = [aff.get_text(" ", strip=True) for aff in affiliations]
 
         # Return as a clean, joined string
-        return " | ".join(affiliation_list) if affiliation_list else ""
+        return " ".join(affiliation_list) if affiliation_list else ""
 
     def extract_abstract_text(self, soup):
         """Extracts the main body of the abstract in plain text with section spacing."""
@@ -333,9 +333,7 @@ class ScrapAbstracts:
                 "doi": self.extract_doi(soup),
                 "number": abstract_number,  # Placeholder or explicitly passed
                 "author_info": (
-                    f"{author_info} -- Affiliations: {affiliations}"
-                    if affiliations
-                    else author_info
+                    f"{author_info}; {affiliations}" if affiliations else author_info
                 ),
                 "abstract": self.extract_abstract_text(soup),
                 "abstract_html": self.extract_abstract_html(soup),
