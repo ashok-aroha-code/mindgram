@@ -1,4 +1,4 @@
-.PHONY: install run all aes-2024 aes-2025 aacr-2026 aacr-2026-url-matcher clean lint test
+.PHONY: install run all aes-2024 aes-2025 aacr-2026-url-scraper aacr-2026-url-matcher clean lint test
 
 install:
 	pip install -r requirements.txt
@@ -14,8 +14,8 @@ ase-2024:
 ase-2025:
 	python main.py -s sciencedirect -t ase -y 2025
 
-aacr-2026:
-	python main.py -s aacrjournals -t aacr -y 2026
+aacr-2026-url-scraper:
+	python scrapers/aacrjournals/aacr/aacr_2026_url_scraper.py
 
 aacr-2026-url-matcher:
 	python scrapers/aacrjournals/aacr/aacr_2026_url_matcher.py
