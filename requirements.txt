@@ -1,0 +1,27 @@
+# ── HTTP & Parsing ──────────────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.1.0                  # faster HTML/XML parser for BS4
+
+# ── JavaScript-heavy pages (if needed) ──────────────────
+selenium>=4.18.0
+webdriver-manager>=4.0.1     # auto-manages chromedriver
+
+# ── Data Handling ────────────────────────────────────────
+pandas>=2.2.0
+openpyxl>=3.1.0              # write .xlsx output
+
+# ── Rate limiting & Retries ──────────────────────────────
+urllib3>=2.2.0
+tenacity>=8.2.0              # retry on failure
+
+# ── Utilities ────────────────────────────────────────────
+python-dotenv>=1.0.0         # load .env for API keys/cookies
+tqdm>=4.66.0                 # progress bar in terminal
+loguru>=0.7.0                # better logging than print()
+
+# ── Dev / Testing ────────────────────────────────────────
+pytest>=8.0.0
+flake8>=7.0.0
+
+undetected-chromedriver>=3.5.5
