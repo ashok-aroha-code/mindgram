@@ -1,3 +1,7 @@
+import os
+import json
+from loguru import logger
+
 def load_json(file_path):
     """Safely loads data from a JSON file."""
     if not os.path.exists(file_path):

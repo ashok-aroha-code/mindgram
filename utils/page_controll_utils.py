@@ -1,3 +1,6 @@
+import time
+from loguru import logger
+
 def scroll_down_untill_bottom(driver):
     """Scrolls until the bottom of the page is reached."""
     try:
