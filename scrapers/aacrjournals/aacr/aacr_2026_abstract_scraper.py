@@ -319,44 +319,46 @@ def scrape_articles_single_window(urls):
     return articles_data
 
 
-def main():
-    """Main function to run the scraper."""
-    logging.basicConfig(
-        filename="scraper.log",
-        level=logging.ERROR,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+class AACR2026AbstractScraper:
+    def run(self):
+        """Main function to run the scraper."""
+        logging.basicConfig(
+            filename="scraper.log",
+            level=logging.ERROR,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
 
-    # Load URLs
-    try:
-        with open(INPUT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Extract URLs from the list of dicts: [{"title": "...", "url": "..."}, ...]
-        urls = [item["url"] for item in data if "url" in item]
-
-        print(f"Loaded {len(urls)} URLs from {INPUT_FILE}")
-    except Exception as e:
-        logging.error(f"Error loading URLs: {str(e)}")
-        print(f"Error loading URLs: {str(e)}")
-        return
-
-    # Scrape articles using a single window
-    articles_data = scrape_articles_single_window(urls)
-
-    # Save results
-    if articles_data:
+        # Load URLs
         try:
-            save_json(articles_data, OUTPUT_FILE)
-            print(
-                f"Successfully scraped {len(articles_data)} articles. Data saved to {OUTPUT_FILE}"
-            )
+            with open(INPUT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Extract URLs from the list of dicts: [{"title": "...", "url": "..."}, ...]
+            urls = [item["url"] for item in data if "url" in item]
+
+            print(f"Loaded {len(urls)} URLs from {INPUT_FILE}")
         except Exception as e:
-            logging.error(f"Error saving data: {str(e)}")
-            print(f"Error saving data: {str(e)}")
-    else:
-        print("No articles were successfully scraped")
+            logging.error(f"Error loading URLs: {str(e)}")
+            print(f"Error loading URLs: {str(e)}")
+            return
+
+        # Scrape articles using a single window
+        articles_data = scrape_articles_single_window(urls)
+
+        # Save results
+        if articles_data:
+            try:
+                save_json(articles_data, OUTPUT_FILE)
+                print(
+                    f"Successfully scraped {len(articles_data)} articles. Data saved to {OUTPUT_FILE}"
+                )
+            except Exception as e:
+                logging.error(f"Error saving data: {str(e)}")
+                print(f"Error saving data: {str(e)}")
+        else:
+            print("No articles were successfully scraped")
 
 
 if __name__ == "__main__":
-    main()
+    scraper = AACR2026AbstractScraper()
+    scraper.run()

@@ -15,13 +15,13 @@ ase-2025:
 	python main.py -s sciencedirect -t ase -y 2025
 
 aacr-2026-us:
-	python scrapers/aacrjournals/aacr/aacr_2026_url_scraper.py
+	python main.py -s aacrjournals -t aacr -y 2026 -tk url-scraper
 
 aacr-2026-as:
-	python scrapers/aacrjournals/aacr/aacr_2026_abstract_scraper.py
+	python main.py -s aacrjournals -t aacr -y 2026 -tk abstract-scraper
 
 aacr-2026-url-matcher:
-	python scrapers/aacrjournals/aacr/aacr_2026_url_matcher.py
+	python main.py -s aacrjournals -t aacr -y 2026 -tk url-matcher
 
 # Run everything
 all:

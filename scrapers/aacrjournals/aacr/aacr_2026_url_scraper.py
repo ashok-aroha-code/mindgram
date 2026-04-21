@@ -145,12 +145,14 @@ class ScrapeAACRLinks:
         return links_data
 
 
-def main():
-    driver = Driver()
-    scraper = ScrapeAACRLinks(driver.get_driver())
-    scraper.scrape_all_links()
-    driver.close()  # Cleanup happens here, correctly, in main()
+class AACR2026URLScraper:
+    def run(self):
+        driver = Driver()
+        scraper = ScrapeAACRLinks(driver.get_driver())
+        scraper.scrape_all_links()
+        driver.close()
 
 
 if __name__ == "__main__":
-    main()
+    scraper = AACR2026URLScraper()
+    scraper.run()
