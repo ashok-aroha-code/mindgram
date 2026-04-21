@@ -2,12 +2,31 @@ import json
 import time
 import logging
 import random
+import os
+import sys
+from pathlib import Path
 from bs4 import BeautifulSoup
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+
+# Fix sys.path to allow imports from project root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.append(str(BASE_DIR))
+
+try:
+    from utils import save_json
+except ImportError:
+    # Fallback if utils not available
+    def save_json(data, path):
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+INPUT_FILE = os.path.join(BASE_DIR, "data", "aacrjournals", "aacr_2026", "aacr_2026_urls.json")
+OUTPUT_FILE = os.path.join(BASE_DIR, "data", "aacrjournals", "aacr_2026", "aacr_2026_abstracts.json")
+FAILED_FILE = os.path.join(BASE_DIR, "data", "aacrjournals", "aacr_2026", "failed_abstract_urls.json")
 
 def setup_driver():
     """Setup undetected Chrome driver to bypass Cloudflare"""
@@ -246,9 +265,9 @@ def scrape_articles_single_window(urls):
     # Save failed URLs to JSON
     if failed_urls:
         try:
-            with open('failed_urls.json', 'w', encoding='utf-8') as f:
+            with open(FAILED_FILE, 'w', encoding='utf-8') as f:
                 json.dump(failed_urls, f, indent=4, ensure_ascii=False)
-            print(f"Saved {len(failed_urls)} failed URLs to failed_urls.json")
+            print(f"Saved {len(failed_urls)} failed URLs to {FAILED_FILE}")
         except Exception as e:
             logging.error(f"Error saving failed URLs: {str(e)}")
     
@@ -264,9 +283,13 @@ def main():
     
     # Load URLs
     try:
-        with open('article_urls.json', 'r') as f:
-            urls = json.load(f)
-        print(f"Loaded {len(urls)} URLs from article_urls.json")
+        with open(INPUT_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Extract URLs from the list of dicts: [{"title": "...", "url": "..."}, ...]
+        urls = [item["url"] for item in data if "url" in item]
+        
+        print(f"Loaded {len(urls)} URLs from {INPUT_FILE}")
     except Exception as e:
         logging.error(f"Error loading URLs: {str(e)}")
         print(f"Error loading URLs: {str(e)}")
@@ -278,10 +301,8 @@ def main():
     # Save results
     if articles_data:
         try:
-            output_filename = 'scraped_data.json'
-            with open(output_filename, 'w', encoding='utf-8') as f:
-                json.dump(articles_data, f, indent=4, ensure_ascii=False)
-            print(f"Successfully scraped {len(articles_data)} articles. Data saved to {output_filename}")
+            save_json(articles_data, OUTPUT_FILE)
+            print(f"Successfully scraped {len(articles_data)} articles. Data saved to {OUTPUT_FILE}")
         except Exception as e:
             logging.error(f"Error saving data: {str(e)}")
             print(f"Error saving data: {str(e)}")
