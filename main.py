@@ -5,6 +5,7 @@ from scrapers.sciencedirect.ase.ase_2025_scraper import ASEScraper2025
 from scrapers.aacrjournals.aacr.aacr_2026_url_scraper import AACR2026URLScraper
 from scrapers.aacrjournals.aacr.aacr_2026_abstract_scraper import AACR2026AbstractScraper
 from scrapers.aacrjournals.aacr.aacr_2026_url_matcher import AACR2026URLMatcher
+from scrapers.asco_meetings.asco.asco_2026_abstract_scraper import ASCO2026AbstractScraper
 
 
 SCRAPERS = {
@@ -14,6 +15,7 @@ SCRAPERS = {
     ("aacrjournals", "aacr", "2026", "url-scraper"): AACR2026URLScraper,
     ("aacrjournals", "aacr", "2026", "abstract-scraper"): AACR2026AbstractScraper,
     ("aacrjournals", "aacr", "2026", "url-matcher"): AACR2026URLMatcher,
+    ("meetings.asco.org", "asco", "2026", "abstract-scraper"): ASCO2026AbstractScraper,
 }
 
 

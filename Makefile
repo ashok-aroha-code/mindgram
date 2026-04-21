@@ -26,6 +26,9 @@ aacr-2026-as:
 aacr-2026-url-matcher:
 	python main.py -s aacrjournals -t aacr -y 2026 -tk url-matcher
 
+asco-2026-as:
+	python main.py -s meetings.asco.org -t asco -y 2026 -tk abstract-scraper
+
 # Run everything
 all:
 	python main.py --all
