@@ -1,5 +1,6 @@
 import argparse
-from scrapers.sciencedirect.ase.ase_2024_scraper import ASEScraper2024
+from scrapers.sciencedirect.ase.ase_2024_url_scraper import ASEScraper2024URL
+from scrapers.sciencedirect.ase.ase_2024_abstract_scraper import ASEScraper2024Abstract
 from scrapers.sciencedirect.ase.ase_2025_scraper import ASEScraper2025
 from scrapers.aacrjournals.aacr.aacr_2026_url_scraper import AACR2026URLScraper
 from scrapers.aacrjournals.aacr.aacr_2026_abstract_scraper import AACR2026AbstractScraper
@@ -7,7 +8,8 @@ from scrapers.aacrjournals.aacr.aacr_2026_url_matcher import AACR2026URLMatcher
 
 
 SCRAPERS = {
-    ("sciencedirect", "ase", "2024", "default"): ASEScraper2024,
+    ("sciencedirect", "ase", "2024", "url-scraper"): ASEScraper2024URL,
+    ("sciencedirect", "ase", "2024", "abstract-scraper"): ASEScraper2024Abstract,
     ("sciencedirect", "ase", "2025", "default"): ASEScraper2025,
     ("aacrjournals", "aacr", "2026", "url-scraper"): AACR2026URLScraper,
     ("aacrjournals", "aacr", "2026", "abstract-scraper"): AACR2026AbstractScraper,

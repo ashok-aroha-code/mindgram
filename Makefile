@@ -8,8 +8,11 @@ run:
 	python main.py -s $(s) -t $(t) -y $(y)
 
 # Named aliases — just: make ase-2025
-ase-2024:
-	python main.py -s sciencedirect -t ase -y 2024
+ase-2024-us:
+	python main.py -s sciencedirect -t ase -y 2024 -tk url-scraper
+
+ase-2024-as:
+	python main.py -s sciencedirect -t ase -y 2024 -tk abstract-scraper
 
 ase-2025:
 	python main.py -s sciencedirect -t ase -y 2025
