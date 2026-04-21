@@ -1,11 +1,13 @@
 import argparse
 from scrapers.sciencedirect.ase.ase_2024_scraper import ASEScraper2024
 from scrapers.sciencedirect.ase.ase_2025_scraper import ASEScraper2025
+from scrapers.aacrjournals.aacr.aacr_2026_url_scraper import AACR2026URLScraper
 
 
 SCRAPERS = {
     ("sciencedirect", "ase", "2024"): ASEScraper2024,
-    ("sciencedirect", "ase", "2025"): ASEScraper2025
+    ("sciencedirect", "ase", "2025"): ASEScraper2025,
+    ("aacrjournals", "aacr", "2026"): AACR2026URLScraper
 }
 
 def run(source: str, topic: str, year: str):
