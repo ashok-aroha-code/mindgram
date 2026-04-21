@@ -2,26 +2,21 @@ import requests
 import json
 import time
 import re
-import os
 import sys
-from datetime import datetime
+import random
 from pathlib import Path
+from datetime import datetime
 from html import unescape
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 
-# Fix sys.path to allow imports from project root
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-sys.path.append(str(BASE_DIR))
-
-# GraphQL endpoint
+# Constants
+BASE_DIR = Path(r"D:\Workspace\Projects\mindgram")
 API_URL = "https://api.asco.org/graphql2"
 
-# Headers from legacy scripts
 HEADERS = {
     'accept': '*/*',
     'accept-language': 'en-US,en;q=0.9',
-    'authorization': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMDIzMDEwMSIsIm5hbWUiOiJQdWJsaWNBY2Nlc3MiLCJzY29wZSI6ImFwaS5hc2NvLm9yZy9ncmFwaHFsLnB1YmxpYyIsImNsaWVudF9pZCI6InB1YmxpYyIsImlhdCI6MTY3MjUzMTIwMH0.8aei14SeARjdpov618hKodzJLwnQuW6c4WuBg6PZPcU',
+    'authorization': 'None',
     'content-type': 'application/json',
     'origin': 'https://meetings.asco.org',
     'referer': 'https://meetings.asco.org/',
@@ -44,89 +39,59 @@ SEARCH_QUERY = """query search($q: String, $filters: [SearchFilter], $from: Int,
       }
     }
     status
-    errors {
-      code
-      message
-    }
   }
 }"""
 
-GET_SESSION_QUERY = """query getSession($sessionId: String!) {
-  session(sessionId: $sessionId) {
-    result {
-      contentId
-      title
-      sessionType
-      sessionLocation
-      cmeCredits
-      fullSummary
-      attendanceType
-      sessionDates {
-        start
-        end
-        timeZone
-      }
-      tracks {
-        track
-      }
-      presentations {
-        contentId
-        presentation {
-          title
-          abstractNumber
-          posterBoardNumber
-          presentationDates {
-            start
-            end
-            timeZone
-          }
-          disclosureUrl {
-            queryParams
-          }
-          doiUrl {
-            path
-          }
+SESSION_QUERY = """query session($id: String!) {
+  session(id: $id) {
+    sessionTitle
+    sessionType
+    sessionLocation
+    fullSummary
+    attendanceType
+    cmeCredits
+    sessionDates {
+      start
+      end
+    }
+    tracks {
+      track
+    }
+    presentations {
+      presentation {
+        id
+        title
+        presentationDates {
+          start
+          end
         }
-        abstract {
-          abstractAuthorsString
-          authorInstitutionsString
-          subTrack {
-            subTrack
-          }
-          doi
-          abstractTitle
-          abstractNumber
-          abstractId
-          fullBody
-          clinicalTrialRegistryNumber
+        posterBoardNumber
+        abstractNumber
+        doiUrl {
+          path
+        }
+      }
+      abstract {
+        abstractTitle
+        abstractNumber
+        posterBoardNumber
+        abstractAuthorsString
+        authorInstitutionsString
+        fullBody
+        doi
+        clinicalTrialRegistryNumber
+        subTrack {
+          subTrack
         }
       }
     }
-    status
-    errors {
-      code
-      message
-    }
-  }
-}"""
-
-GET_PERSONS_QUERY = """query getPersons($sessionId: String!) {
-  session(sessionId: $sessionId) {
-    result {
-      contentId
-      persons {
-        presentationId
-        chairs {
-          displayName
-          publicationOrganization
-          role
-        }
-        speakers {
-          displayName
-          publicationOrganization
-          role
-        }
-      }
+    persons {
+      presentationId
+      personId
+      firstName
+      lastName
+      degree
+      institution
     }
     status
     errors {
@@ -144,9 +109,12 @@ class ASCO2026AbstractScraper:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.output_file = output_file or self.output_dir / "asco_2026_abstracts.json"
         
-        # Setup logging
+        # Setup logging with colors
         logger.remove()
-        logger.add(sys.stderr, level="INFO")
+        # Console logging with color for levels (ERROR will be red)
+        logger.add(sys.stderr, 
+                   format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+                   level="INFO")
         logger.add(self.output_dir / "scraper.log", rotation="10 MB", level="DEBUG")
         
         self.session = requests.Session()
@@ -162,145 +130,121 @@ class ASCO2026AbstractScraper:
         # Remove HTML tags
         text = re.sub(r'<[^>]+>', '', text)
         # Normalize whitespace (multiple spaces/newlines to single space)
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = " ".join(text.split())
         return text
 
-    def format_timestamp(self, ts, tz_name="America/Chicago"):
-        """Convert MS timestamp to local date and time."""
+    def format_timestamp(self, ts):
+        """Format ISO timestamp to date and time."""
         if not ts:
-            return None, None
+            return "", ""
         try:
-            # Simple conversion without pytz for now to avoid dependency issues
-            # If accuracy in timezone conversion is critical, we can add pytz
-            dt = datetime.fromtimestamp(ts / 1000)
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
-        except Exception as e:
-            logger.debug(f"Error formatting timestamp {ts}: {e}")
-            return None, None
+        except:
+            return "", ""
 
-    def post_query(self, query, variables, max_retries=3):
-        """Send a GraphQL POST request with retry logic."""
-        # Clean query for API
-        clean_query = " ".join(query.split())
+    def post_query(self, query, variables, retries=3):
+        """Send a GraphQL POST request with retries."""
         payload = {
-            "operationName": None,
-            "variables": variables,
-            "query": clean_query
+            "query": " ".join(query.split()),
+            "variables": variables
         }
-        
-        for attempt in range(max_retries):
+        for attempt in range(retries):
             try:
                 response = self.session.post(API_URL, json=payload, timeout=30)
-                if response.status_code == 200:
-                    return response.json()
-                elif response.status_code == 429:
-                    wait = (attempt + 1) * 5
-                    logger.warning(f"Rate limited (429). Waiting {wait}s...")
-                    time.sleep(wait)
-                else:
-                    logger.error(f"HTTP {response.status_code} for variables {variables}")
-                    if response.status_code in [401, 403]:
-                        logger.critical("Authentication failed. Tokens might be expired.")
-                        return None
+                if response.status_code == 403:
+                    logger.warning(f"403 Forbidden on attempt {attempt + 1}. Retrying with backoff...")
+                    time.sleep(5 * (attempt + 1) + random.uniform(1, 5))
+                    continue
+                    
+                response.raise_for_status()
+                return response.json()
             except Exception as e:
-                logger.error(f"Request error: {e}")
-                time.sleep(2)
-        
+                logger.error(f"Request failed (Attempt {attempt + 1}/{retries}): {e}")
+                time.sleep(2 * (attempt + 1))
         return None
 
     def fetch_all_session_ids(self):
-        """Fetch all session IDs for the meeting dynamically."""
-        logger.info(f"Fetching all session IDs for meeting {self.meeting_id}...")
+        """Discover all session IDs for the meeting using the search API."""
+        logger.info("Discovering session IDs via search API...")
         variables = {
             "q": "",
             "filters": [
-                {"field": "meetingId", "values": [str(self.meeting_id)]},
-                {"field": "contentTypeGroupLabel", "values": ["Sessions"]}
+                {"field": "meetingId", "value": self.meeting_id},
+                {"field": "contentType", "value": "Session"}
             ],
             "from": 0,
-            "size": 1000
+            "size": 1000,
+            "sort": [{"field": "sessionDate", "order": "asc"}]
         }
         
-        response = self.post_query(SEARCH_QUERY, variables)
-        if not response:
+        data = self.post_query(SEARCH_QUERY, variables)
+        if not data:
             return []
             
+        hits = []
         try:
-            hits = response.get("data", {}).get("search", {}).get("result", {}).get("groups", {}).get("hits", [])
-            ids = [hit["contentId"] for hit in hits if hit.get("contentId")]
-            logger.info(f"Successfully fetched {len(ids)} session IDs from API.")
-            return ids
+            groups = data.get("data", {}).get("search", {}).get("result", {}).get("groups", [])
+            for group in groups:
+                hits.extend(group.get("hits", []))
         except Exception as e:
-            logger.error(f"Error parsing session IDs: {e}")
-            return []
+            logger.error(f"Error parsing search results: {e}")
+            
+        session_ids = [hit.get("contentId") for hit in hits if hit.get("contentId")]
+        logger.info(f"Discovered {len(session_ids)} session IDs.")
+        return session_ids
 
-    def fetch_session_details(self, session_id):
-        """Fetch session and presentation details."""
-        return self.post_query(GET_SESSION_QUERY, {"sessionId": str(session_id)})
+    def extract_presentation_id(self, pres_data):
+        """Extract the simple numeric ID from the presentation ID."""
+        raw_id = pres_data.get("id") or ""
+        if "::" in raw_id:
+            return raw_id.split("::")[-1]
+        return raw_id
 
-    def fetch_participant_info(self, session_id):
-        """Fetch authors and speakers info."""
-        return self.post_query(GET_PERSONS_QUERY, {"sessionId": str(session_id)})
-
-    def extract_presentation_id(self, presentation):
-        """Extract presentation ID from disclosureUrl queryParams."""
-        try:
-            disclosure_url = presentation.get("disclosureUrl")
-            if disclosure_url and disclosure_url.get("queryParams"):
-                params = json.loads(disclosure_url["queryParams"])
-                return str(params.get("id", ""))
-        except Exception:
-            pass
-        return ""
-
-    def parse_author_info(self, persons_data, presentation_id):
-        """Extract author info for a specific presentation ID."""
-        if not persons_data:
+    def parse_author_info(self, raw_persons, presentation_id):
+        """Parse persons data into a formatted author string."""
+        if not raw_persons:
             return ""
+            
+        presentation_persons = [p for p in raw_persons if p.get("presentationId") == presentation_id]
+        if not presentation_persons:
+            # Try to match without prefixes if needed
+            presentation_persons = [p for p in raw_persons if self.extract_presentation_id(p) == presentation_id]
+            
+        authors = []
+        for p in presentation_persons:
+            name = f"{p.get('firstName', '')} {p.get('lastName', '')}".strip()
+            degree = p.get('degree')
+            if degree:
+                name = f"{name}, {degree}"
+            inst = p.get('institution')
+            if inst:
+                authors.append(f"{name}; {inst}")
+            else:
+                authors.append(name)
         
-        try:
-            persons_list = persons_data.get("data", {}).get("session", {}).get("result", {}).get("persons", [])
-            for p in persons_list:
-                if str(p.get("presentationId")) == str(presentation_id):
-                    # Try chairs first, then speakers
-                    authors = []
-                    for role_key in ["chairs", "speakers"]:
-                        role_list = p.get(role_key, [])
-                        if role_list:
-                            for person in role_list:
-                                name = self.clean_text(person.get("displayName"))
-                                aff = self.clean_text(person.get("publicationOrganization"))
-                                if name:
-                                    authors.append(f"{name}; {aff}" if aff else name)
-                    return ", ".join(authors)
-        except Exception as e:
-            logger.debug(f"Error parsing author info for {presentation_id}: {e}")
-        
-        return ""
+        return ", ".join(authors)
 
     def process_session(self, session_id):
-        """Process a single session and return list of abstract objects."""
-        logger.info(f"Processing session {session_id}...")
+        """Fetch and process a single session's data."""
+        variables = {"id": session_id}
+        data = self.post_query(SESSION_QUERY, variables)
         
-        raw_session = self.fetch_session_details(session_id)
-        raw_persons = self.fetch_participant_info(session_id)
-        
-        if not raw_session:
-            logger.error(f"Failed to fetch session {session_id}")
+        if not data:
             return []
-
-        session_res = raw_session.get("data", {}).get("session", {}).get("result")
+            
+        session_res = data.get("data", {}).get("session")
         if not session_res:
-            logger.warning(f"No result found for session {session_id}")
+            logger.warning(f"No session data found for ID {session_id}")
             return []
 
-        # Session level metadata
-        session_name = self.clean_text(session_res.get("title"))
+        session_name = self.clean_text(session_res.get("sessionTitle"))
         session_type = self.clean_text(session_res.get("sessionType"))
         location = self.clean_text(session_res.get("sessionLocation"))
         ce_credit = self.clean_text(str(session_res.get("cmeCredits") or ""))
         session_description = self.clean_text(session_res.get("fullSummary"))
         attendance_type = self.clean_text(session_res.get("attendanceType"))
+        raw_persons = session_res.get("persons", [])
         
         tracks = [self.clean_text(t.get("track")) for t in session_res.get("tracks", []) if t.get("track")]
         session_track = " ".join(tracks)
@@ -385,85 +329,86 @@ class ASCO2026AbstractScraper:
             
         return abstracts
 
-    def run(self, session_ids=None):
-        """Main execution loop."""
-        if session_ids is None:
-            # Default to loading from legacy folder if not provided
-            ids_file = Path(r"D:\Workspace\Projects\mindgram\legacy\Done VH 2 ASCO 2026 Annual Meeting\session_ids.json")
-            if ids_file.exists():
-                with open(ids_file, 'r') as f:
-                    session_ids = json.load(f)
-                logger.info(f"Loaded {len(session_ids)} session IDs from legacy folder.")
-            else:
-                logger.error("No session IDs provided and legacy session_ids.json not found.")
-                return
-
-        all_abstracts = []
-        existing_titles = set()
-        
-        # Load existing data to identify "new" entries
+    def load_existing_data(self):
+        """Load existing data to avoid duplicates."""
         if self.output_file.exists():
             try:
                 with open(self.output_file, 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
-                    for abs_item in existing_data.get("abstracts", []):
-                        title = abs_item.get("title")
-                        if title:
-                            title_str = title[0] if isinstance(title, list) else title
-                            existing_titles.add(self.clean_text(title_str))
-                logger.info(f"Loaded {len(existing_titles)} existing abstracts for duplicate check.")
-            except Exception as e:
-                logger.error(f"Error loading existing data: {e}")
+                    data = json.load(f)
+                    return data.get("abstracts", [])
+            except:
+                return []
+        return []
 
-        total = len(session_ids)
+    def run(self, session_ids=None):
+        """Main execution loop."""
+        if session_ids is None:
+            # Try dynamic fetch first
+            session_ids = self.fetch_all_session_ids()
+            
+            # Fallback to loading from legacy folder if API fails
+            if not session_ids:
+                ids_file = Path(r"D:\Workspace\Projects\mindgram\legacy\Done VH 2 ASCO 2026 Annual Meeting\session_ids.json")
+                if ids_file.exists():
+                    with open(ids_file, 'r') as f:
+                        session_ids = json.load(f)
+                    logger.info(f"Loaded {len(session_ids)} session IDs from legacy folder.")
+                else:
+                    logger.error("No session IDs found.")
+                    return
+
+        # Initialize existing data trackers
+        existing_abstracts = self.load_existing_data()
+        existing_keys = set()
+        if isinstance(existing_abstracts, list):
+            for abs_obj in existing_abstracts:
+                s_id = abs_obj.get("abstract_metadata", {}).get("session_id", "")
+                title = abs_obj.get("title", "")
+                existing_keys.add(f"{s_id}|{title}")
+        
+        all_abstracts = []
         new_count = 0
         duplicate_count = 0
-        
-        logger.info(f"Starting crawl for {total} sessions...")
-        
-        # Process sequentially to be safe
-        for idx, sid in enumerate(session_ids, 1):
-            try:
-                results = self.process_session(sid)
-                for res in results:
-                    title = res.get("title")[0]
-                    if self.clean_text(title) not in existing_titles:
-                        all_abstracts.append(res)
-                        existing_titles.add(self.clean_text(title))
-                        new_count += 1
-                    else:
-                        duplicate_count += 1
-                
-                logger.info(f"[{idx}/{total}] Session {sid}: {len(results)} abstracts ({new_count} new so far)")
-                time.sleep(0.5) 
-            except Exception as e:
-                logger.error(f"Error processing session {sid}: {e}")
-        
-        if not all_abstracts and duplicate_count > 0:
-            logger.info("No new abstracts found. All captured data already exists in the output file.")
-            return
 
-        # If we have existing data, we might want to append or just save the new ones
-        # User said "collect new data as well", usually implies merging or just identifying them.
-        # I will merge them into the final list.
+        logger.info(f"Starting crawl for {len(session_ids)} sessions...")
         
-        final_abstracts = []
-        if self.output_file.exists():
-             with open(self.output_file, 'r', encoding='utf-8') as f:
-                final_data = json.load(f)
-                final_abstracts = final_data.get("abstracts", [])
+        for i, session_id in enumerate(session_ids, 1):
+            try:
+                abstracts = self.process_session(session_id)
+                if abstracts:
+                    # Filter out duplicates
+                    new_session_abstracts = []
+                    for a in abstracts:
+                        key = f"{session_id}|{a['title']}"
+                        if key not in existing_keys:
+                            new_session_abstracts.append(a)
+                            existing_keys.add(key)
+                        else:
+                            duplicate_count += 1
+                    
+                    if new_session_abstracts:
+                        all_abstracts.extend(new_session_abstracts)
+                        new_count += len(new_session_abstracts)
+                
+                if i % 10 == 0 or i == len(session_ids):
+                    logger.info(f"[{i}/{len(session_ids)}] Progress: {new_count} new abstracts collected so far...")
+                
+                # Random sleep between 1 and 3 seconds to avoid rate limits
+                time.sleep(random.uniform(1, 3))
+            except Exception as e:
+                logger.error(f"Error processing session {session_id}: {e}")
         
-        final_abstracts.extend(all_abstracts)
+        # Merge new with existing
+        final_abstracts = existing_abstracts + all_abstracts
 
         # Strictly match the requested format
         final_output = {
             "meeting_name": "ASCO 2026 Annual Meeting",
-            "date": "2026-05-26", # Start date of the meeting
+            "date": "2026-05-26",
             "link": "https://meetings.asco.org",
             "abstracts": final_abstracts
         }
         
-        # Log summary for visibility
         logger.info(f"Crawl complete. New: {new_count}, Skipped: {duplicate_count}, Total in file: {len(final_abstracts)}")
         
         # Save to file
@@ -476,21 +421,4 @@ class ASCO2026AbstractScraper:
 
 if __name__ == "__main__":
     scraper = ASCO2026AbstractScraper()
-    
-    # Priority 1: Fetch dynamic IDs from API
-    session_ids = scraper.fetch_all_session_ids()
-    
-    # Priority 2: Fallback to legacy session_ids.json if API fetch fails
-    if not session_ids:
-        ids_file = Path(r"D:\Workspace\Projects\mindgram\legacy\Done VH 2 ASCO 2026 Annual Meeting\session_ids.json")
-        if ids_file.exists():
-            with open(ids_file, 'r') as f:
-                session_ids = json.load(f)
-            logger.info(f"Loaded {len(session_ids)} session IDs from legacy folder.")
-    
-    if not session_ids:
-        logger.error("No session IDs found. Scraper cannot proceed.")
-        sys.exit(1)
-
-    # Run the full scraper
-    scraper.run(session_ids)
+    scraper.run()
