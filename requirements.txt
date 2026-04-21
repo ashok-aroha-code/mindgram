@@ -25,3 +25,5 @@ pytest>=8.0.0
 flake8>=7.0.0
 
 undetected-chromedriver>=3.5.5
+
+pytz==2026.1
