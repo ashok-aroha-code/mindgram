@@ -355,7 +355,7 @@ class ASCO2026AbstractScraper:
 
             abstract_obj = {
                 "link": f"https://meetings.asco.org/meetings/2026-asco-annual-meeting/{self.meeting_id}/{session_id}",
-                "title": [title], # Legacy format uses a list for title
+                "title": title,
                 "doi": doi,
                 "number": "", # Consistent with legacy structure
                 "author_info": author_info,
@@ -455,20 +455,16 @@ class ASCO2026AbstractScraper:
         
         final_abstracts.extend(all_abstracts)
 
-        # Wrap in final structure
+        # Strictly match the requested format
         final_output = {
-            "meeting_id": self.meeting_id,
             "meeting_name": "ASCO 2026 Annual Meeting",
-            "start_date": "Tue, 26 May 2026 00:00:00 GMT",
-            "end_date": "Tue, 02 Jun 2026 00:00:00 GMT",
-            "from_website": "https://meetings.asco.org",
-            "abstracts": final_abstracts,
-            "summary": {
-                "new_entries": new_count,
-                "duplicates_skipped": duplicate_count,
-                "total_count": len(final_abstracts)
-            }
+            "date": "2026-05-26", # Start date of the meeting
+            "link": "https://meetings.asco.org",
+            "abstracts": final_abstracts
         }
+        
+        # Log summary for visibility
+        logger.info(f"Crawl complete. New: {new_count}, Skipped: {duplicate_count}, Total in file: {len(final_abstracts)}")
         
         # Save to file
         try:
