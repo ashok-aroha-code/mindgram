@@ -21,7 +21,7 @@ class SAWCSpring2026(BaseScraper):
         super().__init__(name="SAWC_SUMMER_2026",chrome_version=147)
         self.base_url = "https://www.hmpglobalevents.com/sawcspring/agenda"
         self.output_file = os.path.join("data", "sawc", "sawc_spring_2026.json")
-        self.tab_xpath = "//*[@id='hmp-content-tweaks-session-agenda']//ul/li/button"
+        self.tab_xpath = "//div[contains(@class, 'tabs-wrapper')]//button[@aria-role='tab']"
         self.session_button_xpath = "//div[contains(@class, 'tab-area') and not(contains(@class, 'hidden'))]//button[contains(@class, 'session__header')]"
         self.tab_index = 1
         self.link = "https://www.hmpglobalevents.com/sawcspring/agenda"
@@ -54,19 +54,24 @@ class SAWCSpring2026(BaseScraper):
         }
 
     
-    def click_tab(self,index):
-        tab_xpath = f"//*[@id='hmp-content-tweaks-session-agenda']/div[4]/div[1]/ul/li[{index}]/button"
-        if self.driver.find_element(By.XPATH, tab_xpath).is_enabled():
-            try:
-                safe_click(self.driver, tab_xpath, By.XPATH)
-                return True
-            except Exception as e:
-                logger.error(f"Failed to click tab {index}: {e}")
-        return False
+    def click_tab(self, index):
+        """Clicks a tab by index with retry logic."""
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        
+        # Use the class-level tab_xpath which is more robust
+        tab_xpath = f"({self.tab_xpath})[{index}]"
+        
+        try:
+            # Wait up to 10 seconds for the tab to be clickable
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, tab_xpath)))
+            return safe_click(self.driver, tab_xpath, By.XPATH)
+        except Exception as e:
+            logger.error(f"Failed to click tab {index} using {tab_xpath}: {e}")
+            return False
 
     def click_session_header_button(self, index):
         """Clicks the session header button by index for the currently active tab."""
-        # Use the dynamic session_button_xpath and apply the index
         button_xpath = f"({self.session_button_xpath})[{index}]"
         
         try:
@@ -75,94 +80,147 @@ class SAWCSpring2026(BaseScraper):
             logger.error(f"Failed to click session button {index}: {e}")
             return False
 
-    def extract_abstract_info(self):
-        """Extracts information for all abstracts within the currently expanded session."""
+    def extract_abstract_info(self, session_li):
+        """Extracts information for all abstracts within a specific session element."""
         from bs4 import BeautifulSoup
         import re
         
         results = []
         try:
-            # 1. Find the currently expanded session main area
-            # We look for the session__main that is currently visible
-            session_main = self.driver.find_element(By.CSS_SELECTOR, "li.session .session__main:not([style*='display: none'])")
-            
-            # Get the parent container and header to pull common metadata
-            session_li = session_main.find_element(By.XPATH, "./..")
+            # Get the header and main area for this specific session
             header = session_li.find_element(By.CSS_SELECTOR, "button.session__header")
+            session_main = session_li.find_element(By.CSS_SELECTOR, ".session__main")
             
             session_name = header.find_element(By.CSS_SELECTOR, "h4").text.strip()
             session_time = header.find_element(By.CSS_SELECTOR, ".session__date").text.strip()
             
+            # CE Credits
+            ce_credit = ""
+            if "CE" in session_name or "CECH" in session_name:
+                match = re.search(r"(\d+\.?\d*)\s*CE", session_name)
+                ce_credit = match.group(1) if match else ""
+
             try:
                 track = session_main.find_element(By.CSS_SELECTOR, ".session__track").text.strip()
             except:
                 track = ""
                 
             try:
-                location = session_main.find_element(By.XPATH, ".//li[contains(@class, 'session-faculty-group') and .//div[contains(text(), 'Room')]]//span[contains(@class, 'faculty-name')]").text.strip()
+                location_el = session_main.find_element(By.XPATH, ".//li[contains(@class, 'session-faculty-group') and .//div[contains(text(), 'Room')]]//span[contains(@class, 'faculty-name')]")
+                location = location_el.text.strip()
             except:
                 location = ""
 
-            # 2. Check for Sub-sessions (Multiple abstracts case)
+            # Extract main authors
+            main_authors = []
+            try:
+                faculty_names = session_main.find_elements(By.CSS_SELECTOR, "a.faculty-name, span.faculty-name")
+                for f in faculty_names:
+                    name = f.text.strip()
+                    if name and "Room" not in name:
+                        main_authors.append(name)
+            except:
+                pass
+            main_author_info = "; ".join(main_authors)
+
+            # 1. Check for Formal Sub-sessions
             sub_sessions = session_main.find_elements(By.CSS_SELECTOR, "li.sub-session")
             
             if sub_sessions:
                 for sub in sub_sessions:
                     sub_title_full = sub.find_element(By.CSS_SELECTOR, ".session__title").text.strip()
-                    sub_desc_html = sub.find_element(By.CSS_SELECTOR, ".session__description").get_attribute("innerHTML")
+                    try:
+                        sub_desc_html = sub.find_element(By.CSS_SELECTOR, ".session__description").get_attribute("innerHTML")
+                    except:
+                        sub_desc_html = ""
                     
-                    # Extract number if present (e.g. "K2.01")
                     number_match = re.match(r"^([A-Z0-9\.]+)\s+", sub_title_full)
                     number = number_match.group(1) if number_match else ""
                     title = sub_title_full.replace(number, "").strip() if number else sub_title_full
                     
                     soup = BeautifulSoup(sub_desc_html, 'html.parser')
                     
-                    # Create the item
                     metadata = AbstractMetadata(
                         session_name=session_name,
                         session_track=track,
                         date=self.meeting_date,
                         session_time=session_time,
                         location=location,
-                        session_type=track
+                        session_type=track,
+                        ce_credit=ce_credit
                     )
                     
                     results.append(Abstract(
                         link=self.driver.current_url,
                         title=title,
                         number=number,
-                        abstract=soup.get_text(separator="\n").strip(),
+                        author_info=main_author_info,
+                        abstract=soup.get_text(separator="\n").strip() if sub_desc_html else "-",
                         abstract_html=sub_desc_html,
                         abstract_metadata=metadata
                     ))
             else:
-                # 3. Single Session Case
+                # 2. Check for "Embedded" Abstracts
                 try:
                     desc_element = session_main.find_element(By.CSS_SELECTOR, ".session__description")
                     desc_html = desc_element.get_attribute("innerHTML")
-                    soup = BeautifulSoup(desc_html, 'html.parser')
-                    abstract_text = soup.get_text(separator="\n").strip()
                 except:
                     desc_html = ""
-                    abstract_text = "-"
-
-                metadata = AbstractMetadata(
-                    session_name=session_name,
-                    session_track=track,
-                    date=self.meeting_date,
-                    session_time=session_time,
-                    location=location,
-                    session_type=track
-                )
                 
-                results.append(Abstract(
-                    link=self.driver.current_url,
-                    title=session_name,
-                    abstract=abstract_text,
-                    abstract_html=desc_html,
-                    abstract_metadata=metadata
-                ))
+                if desc_html and desc_html.count("<b>") > 1:
+                    # Smart Splitter
+                    blocks = re.split(r"(?=<b>[A-Z0-9\.]+)", desc_html)
+                    for block in blocks:
+                        if not block.strip(): continue
+                        block_soup = BeautifulSoup(block, 'html.parser')
+                        title_b = block_soup.find('b')
+                        if title_b:
+                            full_title = title_b.text.strip()
+                            number_match = re.match(r"^([A-Z0-9\.]+)", full_title)
+                            num = number_match.group(1) if number_match else ""
+                            t = full_title.replace(num, "").strip()
+                            
+                            metadata = AbstractMetadata(
+                                session_name=session_name,
+                                session_track=track,
+                                date=self.meeting_date,
+                                session_time=session_time,
+                                location=location,
+                                ce_credit=ce_credit
+                            )
+                            
+                            results.append(Abstract(
+                                link=self.driver.current_url,
+                                title=t,
+                                number=num,
+                                author_info=main_author_info,
+                                abstract=block_soup.get_text(separator="\n").strip(),
+                                abstract_html=block,
+                                abstract_metadata=metadata
+                            ))
+                else:
+                    # 3. Single Session Case
+                    soup = BeautifulSoup(desc_html, 'html.parser')
+                    abstract_text = soup.get_text(separator="\n").strip() if desc_html else "-"
+
+                    metadata = AbstractMetadata(
+                        session_name=session_name,
+                        session_track=track,
+                        date=self.meeting_date,
+                        session_time=session_time,
+                        location=location,
+                        session_type=track,
+                        ce_credit=ce_credit
+                    )
+                    
+                    results.append(Abstract(
+                        link=self.driver.current_url,
+                        title=session_name,
+                        author_info=main_author_info,
+                        abstract=abstract_text,
+                        abstract_html=desc_html,
+                        abstract_metadata=metadata
+                    ))
                 
         except Exception as e:
             logger.error(f"Error during extraction: {e}")
@@ -243,8 +301,14 @@ class SAWCSpring2026(BaseScraper):
                 
                 time.sleep(1.5)
                 
-                # Extract and save immediately
-                abstract_list = self.extract_abstract_info()
+                # Extract and save immediately (passing the specific session element)
+                try:
+                    session_li = self.driver.find_element(By.XPATH, f"({self.session_button_xpath})[{j}]/ancestor::li[contains(@class, 'session')]")
+                    abstract_list = self.extract_abstract_info(session_li)
+                except Exception as e:
+                    logger.error(f"Failed to find session element for extraction: {e}")
+                    continue
+
                 if abstract_list:
                     self.save_incremental(abstract_list)
                     # Add to memory cache to avoid re-scraping in the same run
