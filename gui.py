@@ -117,7 +117,7 @@ st.title("🕸️ Mindgram Scraper Dashboard")
 st.info(f"Target: **{source}** > **{topic}** > **{year}** [Task: **{task}**]")
 
 # Parameters Layout
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 # Try to get current count
 current_count = 0
@@ -138,10 +138,24 @@ with col2:
 with col3:
     st.metric("Year", year)
 with col4:
-    st.metric("Total Abstracts", current_count, delta=None)
+    # Use a placeholder for the live count card
+    total_count_placeholder = st.empty()
+    total_count_placeholder.metric("Total Abstracts", current_count)
+with col5:
+    # Placeholder for session-only increment (Styled like a premium card)
+    session_count_placeholder = st.empty()
+    session_count_placeholder.markdown(f"""
+        <div style="background-color: #1e2128; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71;">
+            <p style="color: #808495; margin: 0; font-size: 0.8rem; text-transform: uppercase;">Session Count</p>
+            <h2 style="color: #2ecc71; margin: 0; font-size: 2rem;">+0</h2>
+        </div>
+    """, unsafe_allow_html=True)
 
 # Execution Logic
-if st.session_state.run_scraper:
+if "last_logs" not in st.session_state:
+    st.session_state.last_logs = ""
+
+if st.session_state.run_scraper or st.session_state.last_logs:
     st.markdown("### 🖥️ Live Console Output")
     
     # Create a scrollable container for the log
@@ -149,7 +163,11 @@ if st.session_state.run_scraper:
     log_container = st.container(height=400)
     log_area = log_container.empty()
     
-    # Build the command
+    if st.session_state.run_scraper:
+        # Clear previous logs if starting a new run
+        st.session_state.last_logs = ""
+        
+        # Build the command
     cmd = ["python", "main.py", "-s", source, "-t", topic, "-y", year, "-tk", task]
     if headless:
         cmd.append("--headless")
@@ -165,48 +183,67 @@ if st.session_state.run_scraper:
     )
     
     full_log = ""
-    status_placeholder = st.empty()
     errors_found = []
 
-    for line in process.stdout:
-        clean_line = strip_ansi_codes(line)
-        full_log += clean_line
-        
-        # Monitor for errors
-        if "ERROR" in clean_line or "Exception" in clean_line:
-            errors_found.append(clean_line.strip())
-            error_alert_area.error(f"🚨 **Error detected!** Check logs below.\n\n{errors_found[-1]}")
-            st.toast("🚨 Scraper Error Detected!", icon="🔥")
-        
-        # Look for the special [OUTPUT_PATH] tag to lock onto the correct file
-        if "[OUTPUT_PATH]" in clean_line:
-            path_match = clean_line.split("[OUTPUT_PATH]")[-1].strip()
-            if path_match and path_match != "None":
-                output_path = path_match
+    # Use a while loop to ensure we read everything until the process actually ends
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+            
+        if line:
+            clean_line = strip_ansi_codes(line)
+            full_log += clean_line
+            
+            # Monitor for errors
+            if "ERROR" in clean_line or "Exception" in clean_line:
+                errors_found.append(clean_line.strip())
+                error_alert_area.error(f"🚨 **Error detected!** Check logs below.\n\n{errors_found[-1]}")
+                st.toast("🚨 Scraper Error Detected!", icon="🔥")
+            
+            # Look for output path
+            if "[OUTPUT_PATH]" in clean_line:
+                path_match = clean_line.split("[OUTPUT_PATH]")[-1].strip()
+                if path_match and path_match != "None":
+                    output_path = path_match
 
-        # Every time we get a log line, check the file for a new count
-        if output_path and os.path.exists(output_path):
-            try:
-                with open(output_path, "r", encoding="utf-8") as f:
-                    live_data = json.load(f)
-                    live_count = len(live_data.get("abstracts", []))
-                    status_placeholder.metric("🚀 Live Abstracts Count", live_count)
-            except:
-                pass # File might be locked while writing, just skip this frame
+            # Update count
+            if output_path and os.path.exists(output_path):
+                try:
+                    with open(output_path, "r", encoding="utf-8") as f:
+                        live_data = json.load(f)
+                        live_count = len(live_data.get("abstracts", []))
+                        session_increment = live_count - current_count
+                        total_count_placeholder.metric("Total Abstracts", live_count)
+                        session_count_placeholder.markdown(f"""
+                            <div style="background-color: #1e2128; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71;">
+                                <p style="color: #808495; margin: 0; font-size: 0.8rem; text-transform: uppercase;">Session Count</p>
+                                <h2 style="color: #2ecc71; margin: 0; font-size: 2rem;">+{session_increment}</h2>
+                            </div>
+                        """, unsafe_allow_html=True)
+                except:
+                    pass
 
-        # Update log area
-        log_area.code(full_log)
+            # Update log area
+            st.session_state.last_logs = full_log
+            log_area.code(full_log)
         
-    process.wait()
-    
-    if process.returncode == 0:
-        st.success("✅ Scraper finished successfully!")
-        time.sleep(2)
-        st.rerun()
     else:
-        st.error(f"❌ Scraper failed with exit code {process.returncode}")
-    
-    st.session_state.run_scraper = False
+        # Just show the logs from the previous run
+        log_area.code(st.session_state.last_logs)
+        
+    # Wait for process if it was running
+    if st.session_state.run_scraper:
+        process.wait()
+        
+        if process.returncode == 0:
+            st.success("✅ Scraper finished successfully!")
+            st.session_state.run_scraper = False # Clear state before rerun
+            time.sleep(3)
+            st.rerun()
+        else:
+            st.error(f"❌ Scraper failed with exit code {process.returncode}")
+            st.session_state.run_scraper = False
 
 # --- RESULTS VIEWER ---
 st.markdown("---")
