@@ -1,0 +1,40 @@
+{
+    "meeting_name": "",
+    "date": "",
+    "link": "",
+    "abstracts": [
+        {
+            "link": "",
+            "title": "",
+            "doi": "",
+            "number": "",
+            "author_info": "",
+            "abstract": "",
+            "abstract_html": "",
+            "abstract_markdown": "",
+            "abstract_metadata": {
+                "session_name": "",
+                "session_id": "",
+                "session_type": "",
+                "session_track": "",
+                "session_description": "",
+                "date": "",
+                "session_time": "",
+                "location": "",
+                "presentation_id": "",
+                "presentation_time": "",
+                "speaker_type": "",
+                "learning_objectives": [],
+                "ce_credit": "",
+                "ce_credit_hours": "",
+                "ce_credit_type": "",
+                "attendance_type": "",
+                "accreditation_status": "",
+                "grant_disclosure": "",
+                "conflict_of_interest": "",
+                "tags": [],
+                "social_share_links": []
+            }
+        }
+    ]
+}
