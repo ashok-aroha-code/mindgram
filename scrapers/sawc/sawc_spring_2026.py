@@ -170,68 +170,92 @@ class SAWCSpring2026(BaseScraper):
         return results
 
 
-    def execute(self):
-        # Step 1: Go to url 
-        self.driver.get(self.base_url)
-        abstracts = []
+    def save_incremental(self, new_abstracts):
+        """Saves new abstracts to the JSON file immediately to prevent data loss."""
+        from dataclasses import asdict
         
-        # logger.info("Dismiss cookie banner")
-        # dismiss_cookie_banner()
-        # time.sleep(3)
+        # Load existing data or create new Meeting structure
+        meeting_dict = load_json(self.output_file)
+        if not meeting_dict or "abstracts" not in meeting_dict:
+            # Initialize new structure
+            meeting_dict = Meeting(
+                meeting_name=self.meeting_name,
+                date=self.meeting_date,
+                link=self.base_url,
+                abstracts=[]
+            ).to_dict()
 
+        # Add new abstracts (converting objects to dicts)
+        for abstract in new_abstracts:
+            meeting_dict["abstracts"].append(asdict(abstract))
 
-        logger.info("Counting tabs..")
-        logger.info(f'Tab XPATH {self.tab_xpath}')
+        # Save back to file
+        save_json(meeting_dict, self.output_file)
+
+    def execute(self):
+        # Step 1: Initialize and load existing progress
+        self.driver.get(self.base_url)
+        
+        # Load existing titles to skip them
+        existing_data = load_json(self.output_file)
+        scraped_titles = set()
+        if existing_data and "abstracts" in existing_data:
+            scraped_titles = {a["title"] for a in existing_data["abstracts"]}
+            logger.info(f"Resuming: Found {len(scraped_titles)} already scraped items.")
+
+        time.sleep(3)
+        
+        # Step 2: Identify Tabs
         tabs = self.driver.find_elements(By.XPATH, self.tab_xpath)
         tabs_count = len(tabs)
         logger.info(f"Detected {tabs_count} tabs on page")
 
-
-        # Step 2: Click on tab 
+        # Step 3: Loop through Tabs
         for i in range(1, tabs_count + 1):
             logger.info(f"Processing Tab {i} of {tabs_count}")
             if not self.click_tab(i):
                 break
 
-            # Wait for tab content to transition (class 'hidden' to be removed)
             time.sleep(2)
             
+            # Find all session buttons in current tab
             session_buttons = self.driver.find_elements(By.XPATH, self.session_button_xpath)
             session_buttons_count = len(session_buttons)
             logger.info(f"Tab {i}: Detected {session_buttons_count} session buttons")
 
-            # Step 3: Loop through session buttons and extract info
+            # Step 4: Loop through sessions
             for j in range(1, session_buttons_count + 1):
-                logger.info(f"  Clicking session button {j} of {session_buttons_count}")
+                # Before clicking, check if we've already done this one
+                try:
+                    btn_xpath = f"({self.session_button_xpath})[{j}]"
+                    btn = self.driver.find_element(By.XPATH, btn_xpath)
+                    title = btn.find_element(By.CSS_SELECTOR, "h4").text.strip()
+                    
+                    if title in scraped_titles:
+                        logger.info(f"  Skipping session {j}: '{title}' (Already Scraped)")
+                        continue
+                except:
+                    pass # Continue to click if check fails
+
+                logger.info(f"  Scraping session {j} of {session_buttons_count}...")
                 if not self.click_session_header_button(j):
-                    continue # Try next button if this one fails
+                    continue 
                 
-                # Small wait to allow session info to expand
                 time.sleep(1.5)
                 
-                # Get abstract data object (returns a list)
+                # Extract and save immediately
                 abstract_list = self.extract_abstract_info()
                 if abstract_list:
-                    abstracts.extend(abstract_list)
-                    logger.info(f"    Extracted {len(abstract_list)} abstracts from this session")
+                    self.save_incremental(abstract_list)
+                    # Add to memory cache to avoid re-scraping in the same run
+                    for a in abstract_list:
+                        scraped_titles.add(a.title)
+                    logger.info(f"    Saved {len(abstract_list)} abstracts incrementally.")
 
-                # Optional: Close the session again to keep the page clean
-                # self.click_session_header_button(j) 
-                break
-            
             time.sleep(1)
-            break
 
-        # Step 4: Bundle everything into the Meeting model and save
-        meeting = Meeting(
-            meeting_name=self.meeting_name,
-            date=self.meeting_date,
-            link=self.base_url,
-            abstracts=abstracts
-        )
+        logger.info(f"Scraping complete. Results saved to {self.output_file}")
 
-        logger.info(f"Scraping complete. Total abstracts: {len(abstracts)}")
-        save_json(meeting.to_dict(), self.output_file)
 
 if __name__=="__main__":
     SAWCSpring2026().run()
