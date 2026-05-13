@@ -10,7 +10,16 @@ import time
 from loguru import logger
 from scrapers.base import BaseScraper
 from scrapers.models import Abstract, AbstractMetadata, Meeting
-from utils import safe_click, dismiss_cookie_banner, save_json, load_json
+from utils import (
+    safe_click, 
+    dismiss_cookie_banner, 
+    save_json, 
+    load_json,
+    extract_ce_credits,
+    clean_html_text,
+    normalize_authors,
+    smart_split_html
+)
 from selenium.webdriver.common.by import By
 
 
@@ -49,8 +58,8 @@ class SAWCSpring2026(BaseScraper):
                             "presentation_id": "",
                             "location": "",
                             "session_description": "",
-                            "attendance_type": "",
-                        },
+                            "attendance_type": ""
+                        }
         }
 
     
@@ -82,9 +91,6 @@ class SAWCSpring2026(BaseScraper):
 
     def extract_abstract_info(self, session_li):
         """Extracts information for all abstracts within a specific session element."""
-        from bs4 import BeautifulSoup
-        import re
-        
         results = []
         try:
             # Get the header and main area for this specific session
@@ -94,11 +100,8 @@ class SAWCSpring2026(BaseScraper):
             session_name = header.find_element(By.CSS_SELECTOR, "h4").text.strip()
             session_time = header.find_element(By.CSS_SELECTOR, ".session__date").text.strip()
             
-            # CE Credits
-            ce_credit = ""
-            if "CE" in session_name or "CECH" in session_name:
-                match = re.search(r"(\d+\.?\d*)\s*CE", session_name)
-                ce_credit = match.group(1) if match else ""
+            # CE Credits (Using Utility)
+            ce_credit = extract_ce_credits(session_name)
 
             try:
                 track = session_main.find_element(By.CSS_SELECTOR, ".session__track").text.strip()
@@ -111,17 +114,14 @@ class SAWCSpring2026(BaseScraper):
             except:
                 location = ""
 
-            # Extract main authors
-            main_authors = []
+            # Extract main authors (Using Utility)
+            raw_authors = []
             try:
                 faculty_names = session_main.find_elements(By.CSS_SELECTOR, "a.faculty-name, span.faculty-name")
-                for f in faculty_names:
-                    name = f.text.strip()
-                    if name and "Room" not in name:
-                        main_authors.append(name)
+                raw_authors = [f.text.strip() for f in faculty_names if f.text.strip()]
             except:
                 pass
-            main_author_info = "; ".join(main_authors)
+            main_author_info = normalize_authors(raw_authors, exclude_keywords=["Room"])
 
             # 1. Check for Formal Sub-sessions
             sub_sessions = session_main.find_elements(By.CSS_SELECTOR, "li.sub-session")
@@ -134,11 +134,10 @@ class SAWCSpring2026(BaseScraper):
                     except:
                         sub_desc_html = ""
                     
-                    number_match = re.match(r"^([A-Z0-9\.]+)\s+", sub_title_full)
-                    number = number_match.group(1) if number_match else ""
-                    title = sub_title_full.replace(number, "").strip() if number else sub_title_full
-                    
-                    soup = BeautifulSoup(sub_desc_html, 'html.parser')
+                    # Split title into number and text
+                    sub_title_blocks = smart_split_html(f"<b>{sub_title_full}</b>")
+                    title = sub_title_blocks[0]["title"] if sub_title_blocks else sub_title_full
+                    number = sub_title_blocks[0]["number"] if sub_title_blocks else ""
                     
                     metadata = AbstractMetadata(
                         session_name=session_name,
@@ -155,54 +154,43 @@ class SAWCSpring2026(BaseScraper):
                         title=title,
                         number=number,
                         author_info=main_author_info,
-                        abstract=soup.get_text(separator="\n").strip() if sub_desc_html else "-",
+                        abstract=clean_html_text(sub_desc_html),
                         abstract_html=sub_desc_html,
                         abstract_metadata=metadata
                     ))
             else:
-                # 2. Check for "Embedded" Abstracts
+                # 2. Check for "Embedded" Abstracts (Oral Abstracts style)
                 try:
                     desc_element = session_main.find_element(By.CSS_SELECTOR, ".session__description")
                     desc_html = desc_element.get_attribute("innerHTML")
                 except:
                     desc_html = ""
                 
-                if desc_html and desc_html.count("<b>") > 1:
-                    # Smart Splitter
-                    blocks = re.split(r"(?=<b>[A-Z0-9\.]+)", desc_html)
-                    for block in blocks:
-                        if not block.strip(): continue
-                        block_soup = BeautifulSoup(block, 'html.parser')
-                        title_b = block_soup.find('b')
-                        if title_b:
-                            full_title = title_b.text.strip()
-                            number_match = re.match(r"^([A-Z0-9\.]+)", full_title)
-                            num = number_match.group(1) if number_match else ""
-                            t = full_title.replace(num, "").strip()
-                            
-                            metadata = AbstractMetadata(
-                                session_name=session_name,
-                                session_track=track,
-                                date=self.meeting_date,
-                                session_time=session_time,
-                                location=location,
-                                ce_credit=ce_credit
-                            )
-                            
-                            results.append(Abstract(
-                                link=self.driver.current_url,
-                                title=t,
-                                number=num,
-                                author_info=main_author_info,
-                                abstract=block_soup.get_text(separator="\n").strip(),
-                                abstract_html=block,
-                                abstract_metadata=metadata
-                            ))
+                # Use Smart Splitter for embedded abstracts
+                abstract_blocks = smart_split_html(desc_html)
+                
+                if len(abstract_blocks) > 1:
+                    for block in abstract_blocks:
+                        metadata = AbstractMetadata(
+                            session_name=session_name,
+                            session_track=track,
+                            date=self.meeting_date,
+                            session_time=session_time,
+                            location=location,
+                            ce_credit=ce_credit
+                        )
+                        
+                        results.append(Abstract(
+                            link=self.driver.current_url,
+                            title=block["title"],
+                            number=block["number"],
+                            author_info=main_author_info,
+                            abstract=block["text"],
+                            abstract_html=block["html"],
+                            abstract_metadata=metadata
+                        ))
                 else:
                     # 3. Single Session Case
-                    soup = BeautifulSoup(desc_html, 'html.parser')
-                    abstract_text = soup.get_text(separator="\n").strip() if desc_html else "-"
-
                     metadata = AbstractMetadata(
                         session_name=session_name,
                         session_track=track,
@@ -217,7 +205,7 @@ class SAWCSpring2026(BaseScraper):
                         link=self.driver.current_url,
                         title=session_name,
                         author_info=main_author_info,
-                        abstract=abstract_text,
+                        abstract=clean_html_text(desc_html),
                         abstract_html=desc_html,
                         abstract_metadata=metadata
                     ))

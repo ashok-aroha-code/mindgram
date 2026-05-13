@@ -10,6 +10,12 @@ from .browser import (
 )
 from .human import HumanBehaviors
 from .timer import ScraperTimer
+from .text import (
+    extract_ce_credits,
+    clean_html_text,
+    normalize_authors,
+    smart_split_html
+)
 
 __all__ = [
     "load_json",
@@ -23,5 +29,9 @@ __all__ = [
     "HumanBehaviors",
     "ScraperTimer",
     "wait_for_element",
-    "get_text_safely"
+    "get_text_safely",
+    "extract_ce_credits",
+    "clean_html_text",
+    "normalize_authors",
+    "smart_split_html"
 ]
