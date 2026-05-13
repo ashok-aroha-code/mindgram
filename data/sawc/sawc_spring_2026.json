@@ -1,0 +1,31 @@
+{
+    "meeting_name": "SAWC Spring 2026",
+    "date": "April 8-11, 2026",
+    "link": "https://www.hmpglobalevents.com/sawcspring/agenda",
+    "abstracts": [
+        {
+            "link": "https://www.hmpglobalevents.com/sawcspring/agenda",
+            "title": "",
+            "doi": "",
+            "number": "",
+            "author_info": "",
+            "abstract": "-",
+            "abstract_html": "",
+            "abstract_markdown": "",
+            "abstract_metadata": {
+                "session_name": "",
+                "session_track": "",
+                "session_id": "",
+                "session_type": "",
+                "ce_credit": "",
+                "date": "",
+                "session_time": "",
+                "presentation_time": "",
+                "presentation_id": "",
+                "location": "",
+                "session_description": "",
+                "attendance_type": ""
+            }
+        }
+    ]
+}

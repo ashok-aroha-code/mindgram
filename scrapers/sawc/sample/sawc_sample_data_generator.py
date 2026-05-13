@@ -1,0 +1,39 @@
+import json
+
+data = {
+    "meeting_name": "SAWC Spring 2026",
+    "date": "April 8-12, 2026",
+    "link": "https://hmpglobalevents.com/sawcspring/agenda",
+    "abstracts": [
+        {
+            "link": "",
+            "title": "Accredited Industry-Supported Pre-Conference: NPWT Innovations in Practice Across the Care Continuum: A Hands-on Workshop",
+            "doi": "",
+            "number": "",
+            "author_info": "Karen Bauer DNP, CWS, FAAWC | Kara Couch MS, CRNP, CWCN-AP, FAAWC | Michael Desvigne MD, FACS, CWS, FACCWS | Paul Kim DPM, MS | Emily Greenstein ARPN, CNP, CWON-AP, FACCWS",
+            "abstract": "This hands-on, experiential workshop delivers an in-depth exploration of the latest advancements in wound care—from hospital to clinic to home. Designed for the interdisciplinary wound care team, the session integrates the full spectrum of innovation in negative pressure wound therapy (NPWT), compression therapy, advanced dressings, and skin care. Through engaging case-based discussions, interactive polling, and immersive hands-on stations, participants will experience how technology and clinical expertise intersect to optimize outcomes across diverse care settings. Expert faculty will guide learners through each phase of the patient journey, emphasizing practical strategies for intervention, and continuity of care.",
+            "abstract_html": "<p>This hands-on, experiential workshop delivers an in-depth exploration of the latest advancements in wound care—from hospital to clinic to home...</p>",
+            "abstract_markdown": "This hands-on, experiential workshop delivers an in-depth exploration of the latest advancements in wound care—from hospital to clinic to home...",
+            "abstract_metadata": {
+                "session_name": "NPWT Innovations in Practice Across the Care Continuum: A Hands-on Workshop",
+                "session_track": "Industry-Supported Pre-Conference",
+                "session_id": "",
+                "session_type": "Industry-Supported Pre-Conference",
+                "ce_credit": "1. Review advancements in NPWT, including novel peel-and-place dressings, and apply an algorithmic approach to selecting appropriate technologies\n2. Analyze the clinical utility of an integrated peel-and-place NPWT dressing in promoting wound healing\n3. Evaluate the importance of periwound skin protection and review the science and clinical application of polymer cyanoacrylate-based skin protectants\n4. Examine case-based scenarios highlighting the components of the NPWT toolkit",
+                "date": "Wednesday, April 8, 2026",
+                "session_time": "8:00 AM - 12:00 PM",
+                "presentation_time": "8:00 AM - 12:00 PM",
+                "presentation_id": "",
+                "location": "Richardson A",
+                "session_description": "HMP Education has designated an unrestricted grant from Solventum, Medical Surgical Business.",
+                "attendance_type": "In-Person"
+            }
+        }
+    ]
+}
+
+with open("sawc_sample_with_abs.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=4, ensure_ascii=False)
+
+print("Done:", len(data["abstracts"]), "abstract(s)")
+print(json.dumps(data, indent=2)[:500])
