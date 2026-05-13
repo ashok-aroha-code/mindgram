@@ -76,6 +76,10 @@ class BaseScraper:
 
     def run(self):
         """Main execution logic."""
+        # Log output path if defined so GUI can pick it up
+        output_file = getattr(self, 'output_file', 'None')
+        logger.info(f"[OUTPUT_PATH] {output_file}")
+
         with self.timer:
             try:
                 self.init_driver()

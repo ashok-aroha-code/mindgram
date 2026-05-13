@@ -27,7 +27,7 @@ from selenium.webdriver.common.by import By
 class SAWCSpring2026(BaseScraper):
 
     def __init__(self):
-        super().__init__(name="SAWC_SUMMER_2026",chrome_version=147)
+        super().__init__(name="SAWC_SPRING_2026",chrome_version=147)
         self.base_url = "https://www.hmpglobalevents.com/sawcspring/agenda"
         self.output_file = os.path.join("data", "sawc", "sawc_spring_2026.json")
         self.tab_xpath = "//div[contains(@class, 'tabs-wrapper')]//button[@aria-role='tab']"

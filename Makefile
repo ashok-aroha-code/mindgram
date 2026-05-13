@@ -1,4 +1,4 @@
-.PHONY: install run all ase-2024 ase-2025 aacr-2026-url-scraper aacr-2026-abstract-scraper aacr-2026-url-matcher clean lint test
+.PHONY: install run all gui ase-2024 ase-2025 aacr-2026-url-scraper aacr-2026-abstract-scraper aacr-2026-url-matcher clean lint test
 
 install:
 	pip install -r requirements.txt
@@ -42,3 +42,6 @@ lint:
 
 test:
 	pytest tests/
+
+gui:
+	streamlit run gui.py
