@@ -76,24 +76,98 @@ class SAWCSpring2026(BaseScraper):
             return False
 
     def extract_abstract_info(self):
-        """Extracts information for a single abstract using reusable models."""
-        from dataclasses import asdict
+        """Extracts information for all abstracts within the currently expanded session."""
+        from bs4 import BeautifulSoup
+        import re
         
-        # 1. Initialize metadata (add more fields as you scrape them)
-        metadata = AbstractMetadata(
-            session_name="",
-            location=""
-        )
+        results = []
+        try:
+            # 1. Find the currently expanded session main area
+            # We look for the session__main that is currently visible
+            session_main = self.driver.find_element(By.CSS_SELECTOR, "li.session .session__main:not([style*='display: none'])")
+            
+            # Get the parent container and header to pull common metadata
+            session_li = session_main.find_element(By.XPATH, "./..")
+            header = session_li.find_element(By.CSS_SELECTOR, "button.session__header")
+            
+            session_name = header.find_element(By.CSS_SELECTOR, "h4").text.strip()
+            session_time = header.find_element(By.CSS_SELECTOR, ".session__date").text.strip()
+            
+            try:
+                track = session_main.find_element(By.CSS_SELECTOR, ".session__track").text.strip()
+            except:
+                track = ""
+                
+            try:
+                location = session_main.find_element(By.XPATH, ".//li[contains(@class, 'session-faculty-group') and .//div[contains(text(), 'Room')]]//span[contains(@class, 'faculty-name')]").text.strip()
+            except:
+                location = ""
 
-        # 2. Initialize the main abstract object
-        abstract_item = Abstract(
-            link=self.link,
-            title="",
-            abstract_metadata=metadata
-        )
+            # 2. Check for Sub-sessions (Multiple abstracts case)
+            sub_sessions = session_main.find_elements(By.CSS_SELECTOR, "li.sub-session")
+            
+            if sub_sessions:
+                for sub in sub_sessions:
+                    sub_title_full = sub.find_element(By.CSS_SELECTOR, ".session__title").text.strip()
+                    sub_desc_html = sub.find_element(By.CSS_SELECTOR, ".session__description").get_attribute("innerHTML")
+                    
+                    # Extract number if present (e.g. "K2.01")
+                    number_match = re.match(r"^([A-Z0-9\.]+)\s+", sub_title_full)
+                    number = number_match.group(1) if number_match else ""
+                    title = sub_title_full.replace(number, "").strip() if number else sub_title_full
+                    
+                    soup = BeautifulSoup(sub_desc_html, 'html.parser')
+                    
+                    # Create the item
+                    metadata = AbstractMetadata(
+                        session_name=session_name,
+                        session_track=track,
+                        date=self.meeting_date,
+                        session_time=session_time,
+                        location=location,
+                        session_type=track
+                    )
+                    
+                    results.append(Abstract(
+                        link=self.driver.current_url,
+                        title=title,
+                        number=number,
+                        abstract=soup.get_text(separator="\n").strip(),
+                        abstract_html=sub_desc_html,
+                        abstract_metadata=metadata
+                    ))
+            else:
+                # 3. Single Session Case
+                try:
+                    desc_element = session_main.find_element(By.CSS_SELECTOR, ".session__description")
+                    desc_html = desc_element.get_attribute("innerHTML")
+                    soup = BeautifulSoup(desc_html, 'html.parser')
+                    abstract_text = soup.get_text(separator="\n").strip()
+                except:
+                    desc_html = ""
+                    abstract_text = "-"
 
-        # 3. Return the object directly
-        return abstract_item
+                metadata = AbstractMetadata(
+                    session_name=session_name,
+                    session_track=track,
+                    date=self.meeting_date,
+                    session_time=session_time,
+                    location=location,
+                    session_type=track
+                )
+                
+                results.append(Abstract(
+                    link=self.driver.current_url,
+                    title=session_name,
+                    abstract=abstract_text,
+                    abstract_html=desc_html,
+                    abstract_metadata=metadata
+                ))
+                
+        except Exception as e:
+            logger.error(f"Error during extraction: {e}")
+
+        return results
 
 
     def execute(self):
@@ -135,10 +209,11 @@ class SAWCSpring2026(BaseScraper):
                 # Small wait to allow session info to expand
                 time.sleep(1.5)
                 
-                # Get abstract data object
-                abstract_data = self.extract_abstract_info()
-                if abstract_data:
-                    abstracts.append(abstract_data)
+                # Get abstract data object (returns a list)
+                abstract_list = self.extract_abstract_info()
+                if abstract_list:
+                    abstracts.extend(abstract_list)
+                    logger.info(f"    Extracted {len(abstract_list)} abstracts from this session")
 
                 # Optional: Close the session again to keep the page clean
                 # self.click_session_header_button(j) 
