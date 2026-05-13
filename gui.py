@@ -102,6 +102,9 @@ with st.sidebar:
     task_options = ["default", "url-scraper", "abstract-scraper", "url-matcher"]
     task = st.selectbox("Select Task", task_options)
 
+    # Headless Mode Toggle
+    headless = st.checkbox("Run in Headless Mode", value=False, help="Runs the scraper without showing the browser window. Saves memory.")
+
     st.markdown("---")
     if st.button("🚀 RUN SCRAPER"):
         st.session_state.run_scraper = True
@@ -140,10 +143,16 @@ with col4:
 # Execution Logic
 if st.session_state.run_scraper:
     st.markdown("### 🖥️ Live Console Output")
-    log_area = st.empty()
+    
+    # Create a scrollable container for the log
+    error_alert_area = st.empty()
+    log_container = st.container(height=400)
+    log_area = log_container.empty()
     
     # Build the command
     cmd = ["python", "main.py", "-s", source, "-t", topic, "-y", year, "-tk", task]
+    if headless:
+        cmd.append("--headless")
     
     # Execute and stream logs
     process = subprocess.Popen(
@@ -157,9 +166,17 @@ if st.session_state.run_scraper:
     
     full_log = ""
     status_placeholder = st.empty()
+    errors_found = []
+
     for line in process.stdout:
         clean_line = strip_ansi_codes(line)
         full_log += clean_line
+        
+        # Monitor for errors
+        if "ERROR" in clean_line or "Exception" in clean_line:
+            errors_found.append(clean_line.strip())
+            error_alert_area.error(f"🚨 **Error detected!** Check logs below.\n\n{errors_found[-1]}")
+            st.toast("🚨 Scraper Error Detected!", icon="🔥")
         
         # Look for the special [OUTPUT_PATH] tag to lock onto the correct file
         if "[OUTPUT_PATH]" in clean_line:

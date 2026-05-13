@@ -40,6 +40,7 @@ def main():
     parser.add_argument("-y", "--year", required=True, help="Year (e.g. 2025)")
     parser.add_argument("-tk", "--task", default="default", help="Task type (e.g. url-scraper, abstract-scraper)")
     parser.add_argument("--all", action="store_true", help="Run all registered scrapers")
+    parser.add_argument("--headless", action="store_true", help="Run in headless mode")
 
     args = parser.parse_args()
 
@@ -48,7 +49,13 @@ def main():
         for s, t, y, tk in SCRAPERS:
             run(s, t, y, tk)
     else:
-        run(args.source, args.topic, args.year, args.task)
+        # Update run to handle headless if needed
+        scraper_class = SCRAPERS.get((args.source, args.topic, args.year, args.task))
+        if scraper_class:
+            print(f"[INFO] Running scraper: {args.source} -> {args.topic} -> {args.year} [Task: {args.task}]")
+            scraper_class(headless=args.headless).run()
+        else:
+            print(f"[ERROR] No scraper found for given parameters.")
 
 if __name__ == "__main__":
     main()

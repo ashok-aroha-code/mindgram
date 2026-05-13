@@ -11,8 +11,8 @@ from scrapers.base import BaseScraper
 from utils import save_json
 
 class ASEScraper2024URL(BaseScraper):
-    def __init__(self):
-        super().__init__(name="ASE_2024_URL")
+    def __init__(self, **kwargs):
+        super().__init__(name="ASE_2024_URL", **kwargs)
         self.output_file = os.path.join("data", "sciencedirect", "ase_2024", "ase_2024_links.json")
         self.base_url = "https://www.sciencedirect.com/journal/journal-of-the-american-society-of-echocardiography/vol/37/issue"
         self.all_articles = []
