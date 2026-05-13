@@ -1,27 +1,19 @@
-import time
-import random
-import logging
 import sys
 from loguru import logger
 import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from utils import (
     setup_driver_options,
     ScraperTimer,
     HumanBehaviors,
-    save_json,
-    load_json,
     ensure_dir
 )
 
 class BaseScraper:
-    def __init__(self, name="BaseScraper", headless=False):
+    def __init__(self, name="BaseScraper", headless=False, chrome_version=None):
         self.name = name
         self.headless = headless
+        self.chrome_version = chrome_version
         self.driver = None
         self.timer = ScraperTimer()
         self.hb = None
@@ -49,7 +41,12 @@ class BaseScraper:
         logger.info(f"Initializing driver for {self.name}...")
         options = setup_driver_options(headless=self.headless)
         try:
-            self.driver = uc.Chrome(options=options)
+            # Use chrome_version if provided (for version mismatches)
+            self.driver = uc.Chrome(
+                options=options, 
+                version_main=self.chrome_version, 
+                use_subprocess=True
+            )
             self.hb = HumanBehaviors(self.driver)
             return self.driver
         except Exception as e:
@@ -61,31 +58,18 @@ class BaseScraper:
         if self.driver:
             logger.info("Closing browser session...")
             try:
-                self.driver.quit()
+                driver_ref = self.driver
+                driver_ref.quit()
             except Exception as e:
-                logger.debug(f"Error during browser closure: {e}")
+                if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
+                    logger.debug("Silenced WinError 6 during driver shutdown.")
+                else:
+                    logger.warning(f"Error during browser closure: {e}")
             finally:
                 self.driver = None
 
-    def wait_for_element(self, selector, by=By.CSS_SELECTOR, timeout=10):
-        """Wait for element to be present."""
-        try:
-            return WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((by, selector))
-            )
-        except TimeoutException:
-            logger.warning(f"Timeout waiting for element: {selector}")
-            return None
-
-    def get_text_safely(self, selector, by=By.CSS_SELECTOR, timeout=10):
-        """Safely extracts text from an element."""
-        element = self.wait_for_element(selector, by, timeout)
-        if element:
-            return element.text.strip().replace("\n", " ").replace("\r", " ")
-        return ""
-
     def run(self):
-        """Main execution logic to be overridden by subclasses."""
+        """Main execution logic."""
         with self.timer:
             try:
                 self.init_driver()
@@ -97,5 +81,5 @@ class BaseScraper:
                 logger.info(f"Run completed in {self.timer.format_elapsed()}")
 
     def execute(self):
-        """Subclasses should implement this."""
+        """Subclasses must implement this."""
         raise NotImplementedError("Subclasses must implement execute()")

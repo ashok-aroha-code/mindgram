@@ -3,6 +3,7 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from loguru import logger
 
 def setup_driver_options(headless=False, images=False):
@@ -16,7 +17,6 @@ def setup_driver_options(headless=False, images=False):
     if headless:
         options.add_argument("--headless")
         
-    # Page load strategy: eager waits for DOMContentLoaded
     options.page_load_strategy = "eager"
     
     prefs = {
@@ -25,6 +25,23 @@ def setup_driver_options(headless=False, images=False):
     }
     options.add_experimental_option("prefs", prefs)
     return options
+
+def wait_for_element(driver, selector, by=By.CSS_SELECTOR, timeout=10):
+    """Wait for element to be present."""
+    try:
+        return WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((by, selector))
+        )
+    except TimeoutException:
+        logger.warning(f"Timeout waiting for element: {selector}")
+        return None
+
+def get_text_safely(driver, selector, by=By.CSS_SELECTOR, timeout=10):
+    """Safely extracts text from an element."""
+    element = wait_for_element(driver, selector, by, timeout)
+    if element:
+        return element.text.strip().replace("\n", " ").replace("\r", " ")
+    return ""
 
 def safe_click(driver, selector, by=By.CSS_SELECTOR, timeout=15):
     """Wait for an element to be clickable and perform a click."""

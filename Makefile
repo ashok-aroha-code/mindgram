@@ -26,6 +26,9 @@ aacr-2026-as:
 aacr-2026-url-matcher:
 	python main.py -s aacrjournals -t aacr -y 2026 -tk url-matcher
 
+sawc-spring-2026:
+	python main.py -s hmpglobalevents -t sawc -y 2026
+
 # Run everything
 all:
 	python main.py --all

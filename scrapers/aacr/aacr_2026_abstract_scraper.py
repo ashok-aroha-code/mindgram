@@ -6,7 +6,7 @@ from loguru import logger
 from selenium.webdriver.common.by import By
 
 from scrapers.base import BaseScraper
-from utils import load_json, save_json
+from utils import load_json, save_json, wait_for_element, get_text_safely
 
 class AACR2026AbstractScraper(BaseScraper):
     def __init__(self):
@@ -57,18 +57,18 @@ class AACR2026AbstractScraper(BaseScraper):
             self.driver.get(url)
             time.sleep(random.uniform(3, 7))
             
-            title = self.get_text_safely("//h1[contains(@class, 'wi-article-title')]", by=By.XPATH)
+            title = get_text_safely(self.driver, "//h1[contains(@class, 'wi-article-title')]", by=By.XPATH)
             if not title: failures.append("Missing title")
             
             number = title.split(":", 1)[0].replace("Abstract ", "").strip() if ":" in title else ""
-            doi = self.get_text_safely("//div[contains(@class, 'citation-doi')]/a", by=By.XPATH)
-            session_name = self.get_text_safely("//span[contains(@class, 'article-client_type')]", by=By.XPATH)
-            date = self.get_text_safely("//span[contains(@class, 'article-date')]", by=By.XPATH)
+            doi = get_text_safely(self.driver, "//div[contains(@class, 'citation-doi')]/a", by=By.XPATH)
+            session_name = get_text_safely(self.driver, "//span[contains(@class, 'article-client_type')]", by=By.XPATH)
+            date = get_text_safely(self.driver, "//span[contains(@class, 'article-date')]", by=By.XPATH)
             
             soup = BeautifulSoup(self.driver.page_source, "html.parser")
             author_info = self.extract_authors_and_affiliations(soup)
             
-            abstract_element = self.wait_for_element("//div[contains(@class, 'js-article-section')]", by=By.XPATH)
+            abstract_element = wait_for_element(self.driver, "//div[contains(@class, 'js-article-section')]", by=By.XPATH)
             abstract_text = abstract_element.text.strip() if abstract_element else "-"
             abstract_html = soup.find("div", class_="js-article-section").prettify() if soup.find("div", class_="js-article-section") else "-"
 
