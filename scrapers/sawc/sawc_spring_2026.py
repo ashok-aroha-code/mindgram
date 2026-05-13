@@ -10,7 +10,7 @@ import time
 from loguru import logger
 from scrapers.base import BaseScraper
 from scrapers.models import Abstract, AbstractMetadata, Meeting
-from utils import safe_click, dismiss_cookie_banner, save_json
+from utils import safe_click, dismiss_cookie_banner, save_json, load_json
 from selenium.webdriver.common.by import By
 
 
