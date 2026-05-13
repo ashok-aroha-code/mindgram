@@ -47,6 +47,7 @@ class BaseScraper:
                 version_main=self.chrome_version, 
                 use_subprocess=True
             )
+            self.driver.maximize_window()
             self.hb = HumanBehaviors(self.driver)
             return self.driver
         except Exception as e:
@@ -54,11 +55,11 @@ class BaseScraper:
             raise
 
     def close_driver(self):
-        """Safely closes the driver."""
+        """Safely closes the driver and prevents double-quit errors."""
         if self.driver:
             logger.info("Closing browser session...")
+            driver_ref = self.driver
             try:
-                driver_ref = self.driver
                 driver_ref.quit()
             except Exception as e:
                 if "WinError 6" in str(e) or "invalid handle" in str(e).lower():
@@ -66,6 +67,11 @@ class BaseScraper:
                 else:
                     logger.warning(f"Error during browser closure: {e}")
             finally:
+                # Monkeypatch quit to be a no-op to prevent UC's __del__ from crashing
+                try:
+                    driver_ref.quit = lambda: None
+                except:
+                    pass
                 self.driver = None
 
     def run(self):
