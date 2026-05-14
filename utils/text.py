@@ -47,12 +47,19 @@ def smart_split_html(html_content, split_tag="b", number_pattern=r"^[A-Z0-9\.]+"
     if not html_content:
         return []
         
-    # Split by the tag (usually <b>)
+    # First try splitting by the tag (usually <b>)
     blocks = re.split(rf"(?=<{split_tag}>)", html_content)
+    
+    # If we only have one block, try splitting by double <br>
+    if len(blocks) <= 1:
+        # Normalize BR tags and split by double BR
+        normalized_html = re.sub(r'<br\s*/?>', '<br>', html_content, flags=re.IGNORECASE)
+        blocks = re.split(r'<br>\s*<br>', normalized_html)
+
     results = []
     
     for block in blocks:
-        if not block.strip():
+        if not block.strip() or len(clean_html_text(block)) < 10:
             continue
             
         soup = BeautifulSoup(block, 'html.parser')
@@ -60,15 +67,21 @@ def smart_split_html(html_content, split_tag="b", number_pattern=r"^[A-Z0-9\.]+"
         
         full_title = ""
         number = ""
-        content = block
         
         if header_tag:
             full_title = header_tag.text.strip()
-            # Extract number if it matches the pattern (e.g., 'K2.01')
+        else:
+            # Fallback: Use the first line of text as the title
+            text_lines = [line.strip() for line in clean_html_text(block).split("\n") if line.strip()]
+            if text_lines:
+                full_title = text_lines[0]
+                
+        # Extract number if it matches the pattern (e.g., 'K2.01')
+        if full_title:
             num_match = re.match(number_pattern, full_title)
             if num_match:
                 number = num_match.group(0)
-                full_title = full_title.replace(number, "").strip()
+                full_title = full_title.replace(number, "").strip().strip(":").strip()
             
         results.append({
             "title": full_title,
