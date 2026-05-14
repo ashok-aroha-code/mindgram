@@ -97,8 +97,7 @@ st.markdown("""
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.image("https://img.icons8.com/fluent/100/000000/spider-web.png", width=80)
-    st.title("Scraper Hub")
+    st.title("🕸️ Scraper Hub")
     st.markdown("---")
     
     # Scraper Selection
@@ -301,7 +300,7 @@ if output_path and os.path.exists(output_path):
                 meta_df = pd.json_normalize(df['abstract_metadata'])
                 df = pd.concat([df.drop(columns=['abstract_metadata']), meta_df], axis=1)
             
-            st.dataframe(df.head(50), use_container_width=True)
+            st.dataframe(df.head(50), width="stretch")
             
             # Download Button
             csv = df.to_csv(index=False).encode('utf-8')
