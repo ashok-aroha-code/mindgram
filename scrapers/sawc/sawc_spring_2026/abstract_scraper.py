@@ -6,6 +6,7 @@
 # Step 6: Repeat Step 4 and step 5 until there is tab button availble 
 
 import os
+import re   
 import time
 from loguru import logger
 from scrapers.base import BaseScraper
@@ -77,6 +78,33 @@ class SAWCSpring2026(BaseScraper):
             # CE Credits
             ce_credit = extract_ce_credits(session_name_orig)
 
+            # 2. Extract Metadata (Extract Location first to use it for filtering authors)
+            location = ""
+            try:
+                # Multiple strategies for Room/Location extraction
+                # 1. Look for specific classes
+                room_els = session_main.find_elements(By.CSS_SELECTOR, ".session-room, .room, .location, .session__room")
+                for r in room_els:
+                    txt = r.text.strip()
+                    if txt and not any(k in txt.lower() for k in ["faculty", "speaker"]):
+                        location = txt.replace("Room", "").strip()
+                        break
+                
+                if not location:
+                    # 2. Look for "Room" label followed by text
+                    try:
+                        room_text = self.driver.execute_script("""
+                            var node = document.evaluate("//*[contains(text(), 'Room') or contains(text(), 'Location')]", arguments[0], null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                            if (node) {
+                                var txt = node.parentElement.innerText;
+                                return txt.replace(/Room|Location/gi, '').trim();
+                            }
+                            return '';
+                        """, session_main)
+                        location = room_text
+                    except: pass
+            except: pass
+
             # Extract Authors and Affiliations in strict format: 'name; affiliation, name; affiliation'
             author_info_list = []
             try:
@@ -89,15 +117,16 @@ class SAWCSpring2026(BaseScraper):
                     for name_el in names_in_el:
                         try:
                             name = name_el.text.strip()
-                            if not name or any(kw in name for kw in ["Room", "Location", "Faculty:", "ISS Speaker"]):
+                            if not name or any(kw in name for kw in ["Room", "Location", "Faculty:", "ISS Speaker", "Moderator"]):
+                                continue
+                            
+                            # If the name matches our location, skip it
+                            if location and name.lower() in location.lower():
                                 continue
                                 
                             # Try to find credentials/titles in the parent container
-                            # We look for siblings or children of the same faculty group
                             parent = name_el.find_element(By.XPATH, "./..")
                             try:
-                                # Look for spans or divs near the name that might be credentials
-                                # Often they are siblings of the name element
                                 title_els = parent.find_elements(By.XPATH, ".//*[contains(@class, 'faculty-') and not(contains(@class, 'name'))]")
                                 if not title_els:
                                     # Fallback: check if there's text after the name in the parent
@@ -117,49 +146,22 @@ class SAWCSpring2026(BaseScraper):
             except:
                 pass
 
-            if not author_info_list:
-                # Final fallback
-                try:
-                    faculty_names = session_main.find_elements(By.CSS_SELECTOR, ".faculty-name")
-                    for fn in faculty_names:
-                        name = fn.text.strip()
-                        if name and not any(kw in name for kw in ["Room", "Location"]):
-                            author_info_list.append(name)
-                except: pass
-            
-            # Remove duplicates and noise
+            # Final Cleanup of Authors
             seen_authors = set()
             unique_authors = []
             for a in author_info_list:
-                if a.lower() not in seen_authors and not any(k in a for k in ["Richardson"]):
-                    unique_authors.append(a)
-                    seen_authors.add(a.lower())
+                # Extra noise filtering (including the location we just found)
+                is_noise = False
+                if location and (location.lower() in a.lower() or a.lower() in location.lower()):
+                    is_noise = True
+                if not is_noise and a.lower() not in seen_authors:
+                    # Remove trailing numeric noise (like '219' if it leaked in)
+                    clean_a = re.sub(r'[, ]+\d+$', '', a).strip()
+                    if clean_a:
+                        unique_authors.append(clean_a)
+                        seen_authors.add(a.lower())
             
             main_author_info = ", ".join(unique_authors)
-
-            # 2. Extract Metadata
-            location = ""
-            try:
-                # Room/Location extraction
-                room_els = session_main.find_elements(By.XPATH, ".//*[contains(text(), 'Room')]/following-sibling::* | .//*[contains(@class, 'room')] | .//*[contains(@class, 'location')]")
-                for r in room_els:
-                    txt = r.text.strip()
-                    if txt:
-                        location = txt
-                        break
-                if not location:
-                    # Try text search for Room label
-                    room_text = self.driver.execute_script("""
-                        var nodes = document.evaluate("//*[contains(text(), 'Room')]", document, null, XPathResult.ANY_TYPE, null);
-                        var node = nodes.iterateNext();
-                        if (node) {
-                            var parent = node.parentElement;
-                            return parent.innerText.replace('Room', '').trim();
-                        }
-                        return '';
-                    """)
-                    location = room_text
-            except: pass
 
             # Check for Formal Sub-sessions
             sub_sessions = session_main.find_elements(By.CSS_SELECTOR, "li.sub-session")
@@ -182,7 +184,8 @@ class SAWCSpring2026(BaseScraper):
                         session_type="",
                         date=self.meeting_date,
                         session_time=session_time,
-                        ce_credit=ce_credit
+                        ce_credit=ce_credit,
+                        location=location
                     )
                     
                     results.append(Abstract(
@@ -212,7 +215,8 @@ class SAWCSpring2026(BaseScraper):
                             session_type="",
                             date=self.meeting_date,
                             session_time=session_time,
-                            ce_credit=ce_credit
+                            ce_credit=ce_credit,
+                            location=location
                         )
                         
                         results.append(Abstract(
@@ -232,7 +236,8 @@ class SAWCSpring2026(BaseScraper):
                         session_type="",
                         date=self.meeting_date,
                         session_time=session_time,
-                        ce_credit=ce_credit
+                        ce_credit=ce_credit,
+                        location=location
                     )
                     
                     results.append(Abstract(
