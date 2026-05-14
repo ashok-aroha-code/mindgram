@@ -194,10 +194,8 @@ if st.session_state.run_scraper or st.session_state.last_logs:
     log_area = log_container.empty()
     
     if st.session_state.run_scraper:
-        # If we are starting but a process already exists (shouldn't happen with our logic, but for safety)
-        if st.session_state.current_process and st.session_state.current_process.poll() is None:
-            pass # Already running
-        else:
+        # If we are starting but a process already exists
+        if not st.session_state.current_process or st.session_state.current_process.poll() is not None:
             # Build the command
             cmd = ["python", "main.py", "-s", source, "-t", topic, "-y", year, "-tk", task]
             if headless:
@@ -214,71 +212,72 @@ if st.session_state.run_scraper or st.session_state.last_logs:
                 universal_newlines=True
             )
             st.session_state.current_process = process
+        else:
+            process = st.session_state.current_process
             
-        process = st.session_state.current_process
-        full_log = ""
-    errors_found = []
+        full_log = st.session_state.last_logs
+        errors_found = []
 
-    # Use a while loop to ensure we read everything until the process actually ends
-    while True:
-        line = process.stdout.readline()
-        if not line and process.poll() is not None:
-            break
-            
-        if line:
-            clean_line = strip_ansi_codes(line)
-            full_log += clean_line
-            
-            # Monitor for errors
-            if "ERROR" in clean_line or "Exception" in clean_line:
-                errors_found.append(clean_line.strip())
-                error_alert_area.error(f"🚨 **Error detected!** Check logs below.\n\n{errors_found[-1]}")
-                st.toast("🚨 Scraper Error Detected!", icon="🔥")
-            
-            # Look for output path
-            if "[OUTPUT_PATH]" in clean_line:
-                path_match = clean_line.split("[OUTPUT_PATH]")[-1].strip()
-                if path_match and path_match != "None":
-                    output_path = path_match
+        # Live streaming loop
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+                
+            if line:
+                clean_line = strip_ansi_codes(line)
+                full_log += clean_line
+                
+                # Monitor for errors
+                if "ERROR" in clean_line or "Exception" in clean_line:
+                    errors_found.append(clean_line.strip())
+                    error_alert_area.error(f"🚨 **Error detected!** Check logs below.\n\n{errors_found[-1]}")
+                    st.toast("🚨 Scraper Error Detected!", icon="🔥")
+                
+                # Look for output path
+                if "[OUTPUT_PATH]" in clean_line:
+                    path_match = clean_line.split("[OUTPUT_PATH]")[-1].strip()
+                    if path_match and path_match != "None":
+                        output_path = path_match
 
-            # Update count
-            if output_path and os.path.exists(output_path):
-                try:
-                    with open(output_path, "r", encoding="utf-8") as f:
-                        live_data = json.load(f)
-                        live_count = len(live_data.get("abstracts", []))
-                        session_increment = live_count - current_count
-                        
-                        # Update Total Count
-                        with total_count_placeholder:
-                            metric_card("Total Abstracts", live_count, border_color="#e67e22")
-                        
-                        # Update Session Count
-                        with session_count_placeholder:
-                            metric_card("Session Count", f"+{session_increment}", color="#2ecc71", border_color="#2ecc71")
-                except:
-                    pass
+                # Update count
+                if output_path and os.path.exists(output_path):
+                    try:
+                        with open(output_path, "r", encoding="utf-8") as f:
+                            live_data = json.load(f)
+                            live_count = len(live_data.get("abstracts", []))
+                            session_increment = live_count - current_count
+                            
+                            # Update Total Count
+                            with total_count_placeholder:
+                                metric_card("Total Abstracts", live_count, border_color="#e67e22")
+                            
+                            # Update Session Count
+                            with session_count_placeholder:
+                                metric_card("Session Count", f"+{session_increment}", color="#2ecc71", border_color="#2ecc71")
+                    except:
+                        pass
 
-            # Update log area
-            st.session_state.last_logs = full_log
-            log_area.code(full_log)
+                # Update log area
+                st.session_state.last_logs = full_log
+                log_area.code(full_log)
         
-    else:
-        # Just show the logs from the previous run
-        log_area.code(st.session_state.last_logs)
-        
-    # Wait for process if it was running
-    if st.session_state.run_scraper:
+        # Wait for process to finish
         process.wait()
         
         if process.returncode == 0:
             st.success("✅ Scraper finished successfully!")
-            st.session_state.run_scraper = False # Clear state before rerun
+            st.session_state.run_scraper = False
+            st.session_state.current_process = None
             time.sleep(3)
             st.rerun()
         else:
             st.error(f"❌ Scraper failed with exit code {process.returncode}")
             st.session_state.run_scraper = False
+            st.session_state.current_process = None
+    else:
+        # Just show the logs from the previous run
+        log_area.code(st.session_state.last_logs)
 
 # --- RESULTS VIEWER ---
 st.markdown("---")
