@@ -80,36 +80,88 @@ class SAWCSpring2026(BaseScraper):
             # Extract Authors and Affiliations in strict format: 'name; affiliation, name; affiliation'
             author_info_list = []
             try:
-                faculty_groups = session_main.find_elements(By.CSS_SELECTOR, ".session-faculty-group")
-                for group in faculty_groups:
-                    try:
-                        name = group.find_element(By.CSS_SELECTOR, ".faculty-name").text.strip()
+                # Target all possible faculty containers
+                faculty_elements = session_main.find_elements(By.CSS_SELECTOR, ".session-faculty, .session-faculty-group, .faculty-group, li:has(.faculty-name)")
+                
+                for el in faculty_elements:
+                    # Find all name elements in this container
+                    names_in_el = el.find_elements(By.CSS_SELECTOR, ".faculty-name, a[href*='/faculty/']")
+                    for name_el in names_in_el:
                         try:
-                            # Try common title/affiliation classes
-                            title = group.find_element(By.CSS_SELECTOR, ".faculty-title, .faculty-credential").text.strip()
+                            name = name_el.text.strip()
+                            if not name or any(kw in name for kw in ["Room", "Location", "Faculty:", "ISS Speaker"]):
+                                continue
+                                
+                            # Try to find credentials/titles in the parent container
+                            # We look for siblings or children of the same faculty group
+                            parent = name_el.find_element(By.XPATH, "./..")
+                            try:
+                                # Look for spans or divs near the name that might be credentials
+                                # Often they are siblings of the name element
+                                title_els = parent.find_elements(By.XPATH, ".//*[contains(@class, 'faculty-') and not(contains(@class, 'name'))]")
+                                if not title_els:
+                                    # Fallback: check if there's text after the name in the parent
+                                    all_text = parent.text.strip()
+                                    title = all_text.replace(name, "").strip().strip(",").strip()
+                                else:
+                                    title = " ".join([t.text.strip() for t in title_els if t.text.strip()])
+                            except:
+                                title = ""
+                            
+                            if title:
+                                author_info_list.append(f"{name}; {title}")
+                            else:
+                                author_info_list.append(name)
                         except:
-                            title = ""
-                        
-                        if title:
-                            author_info_list.append(f"{name}; {title}")
-                        else:
-                            author_info_list.append(name)
-                    except:
-                        continue
+                            continue
             except:
                 pass
 
             if not author_info_list:
-                # Fallback to simple name extraction if groups aren't found
+                # Final fallback
                 try:
-                    faculty_names = session_main.find_elements(By.CSS_SELECTOR, "a.faculty-name, span.faculty-name")
-                    author_info_list = [f.text.strip() for f in faculty_names if f.text.strip()]
-                except:
-                    pass
+                    faculty_names = session_main.find_elements(By.CSS_SELECTOR, ".faculty-name")
+                    for fn in faculty_names:
+                        name = fn.text.strip()
+                        if name and not any(kw in name for kw in ["Room", "Location"]):
+                            author_info_list.append(name)
+                except: pass
             
-            main_author_info = ", ".join(author_info_list)
+            # Remove duplicates and noise
+            seen_authors = set()
+            unique_authors = []
+            for a in author_info_list:
+                if a.lower() not in seen_authors and not any(k in a for k in ["Richardson"]):
+                    unique_authors.append(a)
+                    seen_authors.add(a.lower())
+            
+            main_author_info = ", ".join(unique_authors)
 
-            # 1. Check for Formal Sub-sessions
+            # 2. Extract Metadata
+            location = ""
+            try:
+                # Room/Location extraction
+                room_els = session_main.find_elements(By.XPATH, ".//*[contains(text(), 'Room')]/following-sibling::* | .//*[contains(@class, 'room')] | .//*[contains(@class, 'location')]")
+                for r in room_els:
+                    txt = r.text.strip()
+                    if txt:
+                        location = txt
+                        break
+                if not location:
+                    # Try text search for Room label
+                    room_text = self.driver.execute_script("""
+                        var nodes = document.evaluate("//*[contains(text(), 'Room')]", document, null, XPathResult.ANY_TYPE, null);
+                        var node = nodes.iterateNext();
+                        if (node) {
+                            var parent = node.parentElement;
+                            return parent.innerText.replace('Room', '').trim();
+                        }
+                        return '';
+                    """)
+                    location = room_text
+            except: pass
+
+            # Check for Formal Sub-sessions
             sub_sessions = session_main.find_elements(By.CSS_SELECTOR, "li.sub-session")
             
             if sub_sessions:
@@ -253,6 +305,9 @@ class SAWCSpring2026(BaseScraper):
             logger.info(f"Found {len(duplicates)} duplicate entries. Saved to {self.duplicates_file}")
 
     def execute(self):
+        # Log the raw file path so the GUI monitors the correct file for live updates
+        logger.info(f"[OUTPUT_PATH] {self.raw_file}")
+        
         # Step 1: Read URLs from file
         if not os.path.exists(self.urls_file):
             logger.error(f"URLs file not found: {self.urls_file}. Run url_scraper.py first.")
