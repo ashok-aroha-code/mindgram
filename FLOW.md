@@ -1,52 +1,163 @@
-1. Read first FLOW.md file.
-2. Read second INSTRUCTIONS.md file.
-3. Collect all data with duplicate entries from the website or API.
-4. Remove all duplicate entries from the collected data.
-5. Clean the data by removing any special characters or html tags.
-6. Format the data according to the specified format.
-7. Save the data to the specified format.
+# Medical Conference Scraper — Execution Flow
 
+## 1. `url_scraper.py`
 
-# FLOW.md
-# Medical Conference Scraper — Agent Execution Flow
+### Purpose
+
+Collect all abstract or presentation URLs from the target website.
+
+### Responsibilities
+
+* Crawl all listing/index pages
+* Handle pagination completely
+* Collect every abstract URL
+* Avoid missing pages or URLs
+* Support resume capability
+
+### Output
+
+Generate a JSON file containing all collected URLs:
+
+```text
+{meeting_name}_{year}_urls.json
+```
 
 ---
 
-1. **Read `INSTRUCTIONS.md`**
-   - Understand all field rules, cleaning rules, date formats, and output format before doing anything else.
+## 2. `abstract_scraper.py`
 
-2. **Discover all abstract URLs**
-   - Crawl the listing/index page(s).
-   - Follow pagination until all pages are exhausted.
-   - Build a complete list of individual abstract URLs before extracting anything.
+### Purpose
 
-3. **Scrape raw data from each URL**
-   - For each URL, extract all 9 required fields.
-   - If a field is not found, set it to `""` or `[]` — do not skip the record.
-   - create file with output file with all fields with duplicates name it as {meeting_naem}_{year}_raw.json
+Scrape all abstract data from the collected URLs.
 
+### Input
 
+```text
+{meeting_name}_{year}_urls.json
+```
 
-4. **Remove duplicate records**
-   - A record is a duplicate if it shares the same `link`, same `doi`, or same `number` + `title`.
-   - create a file with records of duplicate entries name it as {meeting_naem}_{year}_duplicates.json
+### Responsibilities
 
-5. **Clean all text fields**
-   - Apply cleaning rules from `INSTRUCTIONS.md § 2` to all plain-text fields.
-   - Do not clean `abstract_html`.
-   - Always set `abstract_markdown` to `""`.
+* Read all URLs from the URLs file
+* Extract all required fields from each abstract page
+* Preserve duplicate entries
+* Do not perform duplicate removal at this stage
+* If a field is missing:
 
-6. **Apply date and time rules**
-   - Use `session_date` as the value for `date` — fall back to `presentation_date` only if session date is absent.
-   - Keep `presentation_time` and `session_time` exactly as written on the source.
+  * Use `""` for string fields
+  * Use `[]` for array fields
+* Support resume capability
 
-7. **Validate all records**
-   - Ensure all 9 top-level fields are present in every record.
-   - Ensure only valid `abstract_metadata` sub-fields are present.
-   - Flag and log any invalid records.
+### Output
 
-8. **Save output**
-    - Save as a UTF-8 JSON array in 
-    - Verify the file is valid JSON before finishing.
+Generate a raw data file containing all records, including duplicates:
 
-9. ***Resume Cabililty*** alwasy be there in script. Means if the script is stopped in between, it should be able to resume from where it left off.
+```text
+{meeting_name}_{year}_raw.json
+```
+
+---
+
+## 3. `duplicate_analysis.py`
+
+### Purpose
+
+Analyze duplicate entries from the raw dataset.
+
+### Input
+
+```text
+{meeting_name}_{year}_raw.json
+```
+
+### Responsibilities
+
+* Identify duplicate records
+* A record is considered duplicate if:
+
+  * `link` matches, OR
+  * `doi` matches, OR
+  * `number` + `title` match
+* Create a separate file containing only duplicate records
+* Include proper comparison context for human analysis
+* Include both duplicate entries for comparison
+* Do not remove duplicates automatically
+
+### Output
+
+Generate a duplicate analysis file:
+
+```text
+{meeting_name}_{year}_duplicates.json
+```
+
+---
+
+# Human Review Step (Mandatory)
+
+### Purpose
+
+Manual verification of duplicate entries.
+
+### Responsibilities
+
+* Review `{meeting_name}_{year}_duplicates.json`
+* Analyze duplicate records manually
+* Make necessary corrections directly in:
+
+```text
+{meeting_name}_{year}_raw.json
+```
+
+### Important Rule
+
+* Duplicate removal or modification must only happen after human verification.
+
+---
+
+## 4. `abstract_cleaner.py`
+
+### Purpose
+
+Clean and standardize the final dataset.
+
+### Input
+
+```text
+{meeting_name}_{year}_raw.json
+```
+
+### Responsibilities
+
+* Remove HTML tags
+* Remove special characters
+* Remove unnecessary whitespace
+* Remove empty or invalid fields
+* Format data according to the required schema
+* Clean all plain-text fields
+* Do not clean `abstract_html`
+* Always set:
+
+```json
+"abstract_markdown": ""
+```
+
+* Remove empty fields from `abstract_metadata`
+* Apply all formatting and validation rules from `INSTRUCTIONS.md`
+
+### Date Rules
+
+* Use `session_date` as the primary `date`
+* Use `presentation_date` only if `session_date` is unavailable
+* Preserve `presentation_time` exactly as provided
+* Preserve `session_time` exactly as provided
+
+### Validation
+
+* Ensure all required fields are present
+* Validate JSON structure
+* Ensure UTF-8 encoding
+
+### Output
+
+Generate the final cleaned dataset file in the required format.

@@ -116,7 +116,7 @@ with st.sidebar:
     year = st.selectbox("Select Year", ["2026", "2025", "2024"])
     
     # Task Selection
-    task_options = ["default", "url-scraper", "abstract-scraper", "url-matcher"]
+    task_options = ["default", "url-scraper", "abstract-scraper", "duplicate-analyzer", "abstract-cleaner", "url-matcher"]
     task = st.selectbox("Select Task", task_options)
 
     # Headless Mode Toggle

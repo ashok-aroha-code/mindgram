@@ -43,6 +43,8 @@ Apply to **all plain-text string fields** (in order):
 
 ---
 
+Note: In the author information, the format should strictly follow: 'author_name; affiliation, author_name; affiliation' and it should not be anything else. If the author information is not available, then it should be an empty string.
+
 ## 4. `abstract_metadata` — 21 Sub-Fields
 
 Below are the field which may or may not be present in the source website or api.
