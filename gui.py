@@ -13,34 +13,43 @@ def strip_ansi_codes(text):
 
 def find_output_path(source, topic, year):
     """Dynamically finds the output JSON file based on common patterns."""
-    base_dir = os.path.join("data", topic)
-    if not os.path.exists(base_dir):
-        return None
-        
+    # Try both data/<topic> and data/<source>/<topic>
+    search_dirs = [
+        os.path.join("data", topic),
+        os.path.join("data", source, topic),
+        os.path.join("data", source, f"{topic}_{year}"),
+    ]
+    
     patterns = [
         f"{topic}_spring_{year}.json",
         f"{topic}_{year}.json",
+        f"{topic}_{year}_abstracts.json",
+        f"{topic}_{year}_urls.json",
         f"{topic}_fall_{year}.json",
         f"{topic}_summer_{year}.json",
         f"{topic}_winter_{year}.json",
     ]
     
-    # Try exact matches first
-    for p in patterns:
-        path = os.path.join(base_dir, p)
-        if os.path.exists(path):
-            return path
+    for base_dir in search_dirs:
+        if not os.path.exists(base_dir):
+            continue
             
-    # Fallback: look for any JSON containing the year in that folder
-    try:
-        files = [f for f in os.listdir(base_dir) if f.endswith(".json") and year in f]
-        if files:
-            # Return the most recently modified one
-            files.sort(key=lambda x: os.path.getmtime(os.path.join(base_dir, x)), reverse=True)
-            return os.path.join(base_dir, files[0])
-    except:
-        pass
-        
+        # Try exact matches first
+        for p in patterns:
+            path = os.path.join(base_dir, p)
+            if os.path.exists(path):
+                return path
+                
+        # Fallback: look for any JSON containing the year in that folder
+        try:
+            files = [f for f in os.listdir(base_dir) if f.endswith(".json") and year in f]
+            if files:
+                # Return the most recently modified one
+                files.sort(key=lambda x: os.path.getmtime(os.path.join(base_dir, x)), reverse=True)
+                return os.path.join(base_dir, files[0])
+        except:
+            pass
+            
     return None
 
 # Set page config
@@ -50,6 +59,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Initialize session state
+if "run_scraper" not in st.session_state:
+    st.session_state.run_scraper = False
+if "current_process" not in st.session_state:
+    st.session_state.current_process = None
+if "logs" not in st.session_state:
+    st.session_state.logs = []
 
 # Custom CSS for a premium look
 st.markdown("""
@@ -105,12 +122,20 @@ with st.sidebar:
     # Headless Mode Toggle
     headless = st.checkbox("Run in Headless Mode", value=False, help="Runs the scraper without showing the browser window. Saves memory.")
 
-    st.markdown("---")
-    if st.button("🚀 RUN SCRAPER"):
-        st.session_state.run_scraper = True
+    if not st.session_state.run_scraper:
+        if st.button("🚀 RUN SCRAPER"):
+            st.session_state.run_scraper = True
+            st.rerun()
     else:
-        if 'run_scraper' not in st.session_state:
+        if st.button("🛑 STOP SCRAPER"):
+            if st.session_state.current_process:
+                st.session_state.current_process.terminate()
+                st.session_state.current_process = None
             st.session_state.run_scraper = False
+            st.rerun()
+
+    st.markdown("---")
+    st.info("Select parameters and click RUN to start scraping.")
 
 # --- MAIN AREA ---
 st.title("🕸️ Mindgram Scraper Dashboard")
@@ -118,6 +143,14 @@ st.info(f"Target: **{source}** > **{topic}** > **{year}** [Task: **{task}**]")
 
 # Parameters Layout
 col1, col2, col3, col4, col5 = st.columns(5)
+
+def metric_card(label, value, color="#ffffff", border_color="#3498db"):
+    st.markdown(f"""
+        <div style="background-color: #1e2128; padding: 15px; border-radius: 10px; border-left: 5px solid {border_color}; height: 100px;">
+            <p style="color: #808495; margin: 0; font-size: 0.7rem; text-transform: uppercase; font-weight: bold;">{label}</p>
+            <h2 style="color: {color}; margin: 0; font-size: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{value}</h2>
+        </div>
+    """, unsafe_allow_html=True)
 
 # Try to get current count
 current_count = 0
@@ -132,28 +165,25 @@ if output_path and os.path.exists(output_path):
         pass
 
 with col1:
-    st.metric("Source", source)
+    metric_card("Source", source, border_color="#3498db")
 with col2:
-    st.metric("Topic", topic)
+    metric_card("Topic", topic, border_color="#9b59b6")
 with col3:
-    st.metric("Year", year)
+    metric_card("Year", year, border_color="#f1c40f")
 with col4:
-    # Use a placeholder for the live count card
     total_count_placeholder = st.empty()
-    total_count_placeholder.metric("Total Abstracts", current_count)
+    with total_count_placeholder:
+        metric_card("Total Abstracts", current_count, border_color="#e67e22")
 with col5:
-    # Placeholder for session-only increment (Styled like a premium card)
     session_count_placeholder = st.empty()
-    session_count_placeholder.markdown(f"""
-        <div style="background-color: #1e2128; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71;">
-            <p style="color: #808495; margin: 0; font-size: 0.8rem; text-transform: uppercase;">Session Count</p>
-            <h2 style="color: #2ecc71; margin: 0; font-size: 2rem;">+0</h2>
-        </div>
-    """, unsafe_allow_html=True)
+    with session_count_placeholder:
+        metric_card("Session Count", "+0", color="#2ecc71", border_color="#2ecc71")
 
 # Execution Logic
 if "last_logs" not in st.session_state:
     st.session_state.last_logs = ""
+if "current_process" not in st.session_state:
+    st.session_state.current_process = None
 
 if st.session_state.run_scraper or st.session_state.last_logs:
     st.markdown("### 🖥️ Live Console Output")
@@ -164,25 +194,29 @@ if st.session_state.run_scraper or st.session_state.last_logs:
     log_area = log_container.empty()
     
     if st.session_state.run_scraper:
-        # Clear previous logs if starting a new run
-        st.session_state.last_logs = ""
-        
-        # Build the command
-    cmd = ["python", "main.py", "-s", source, "-t", topic, "-y", year, "-tk", task]
-    if headless:
-        cmd.append("--headless")
-    
-    # Execute and stream logs
-    process = subprocess.Popen(
-        cmd, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.STDOUT, 
-        text=True, 
-        bufsize=1, 
-        universal_newlines=True
-    )
-    
-    full_log = ""
+        # If we are starting but a process already exists (shouldn't happen with our logic, but for safety)
+        if st.session_state.current_process and st.session_state.current_process.poll() is None:
+            pass # Already running
+        else:
+            # Build the command
+            cmd = ["python", "main.py", "-s", source, "-t", topic, "-y", year, "-tk", task]
+            if headless:
+                cmd.append("--headless")
+            
+            # Execute and stream logs
+            st.session_state.last_logs = ""
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT, 
+                text=True, 
+                bufsize=1, 
+                universal_newlines=True
+            )
+            st.session_state.current_process = process
+            
+        process = st.session_state.current_process
+        full_log = ""
     errors_found = []
 
     # Use a while loop to ensure we read everything until the process actually ends
@@ -214,13 +248,14 @@ if st.session_state.run_scraper or st.session_state.last_logs:
                         live_data = json.load(f)
                         live_count = len(live_data.get("abstracts", []))
                         session_increment = live_count - current_count
-                        total_count_placeholder.metric("Total Abstracts", live_count)
-                        session_count_placeholder.markdown(f"""
-                            <div style="background-color: #1e2128; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71;">
-                                <p style="color: #808495; margin: 0; font-size: 0.8rem; text-transform: uppercase;">Session Count</p>
-                                <h2 style="color: #2ecc71; margin: 0; font-size: 2rem;">+{session_increment}</h2>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        
+                        # Update Total Count
+                        with total_count_placeholder:
+                            metric_card("Total Abstracts", live_count, border_color="#e67e22")
+                        
+                        # Update Session Count
+                        with session_count_placeholder:
+                            metric_card("Session Count", f"+{session_increment}", color="#2ecc71", border_color="#2ecc71")
                 except:
                     pass
 

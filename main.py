@@ -1,11 +1,11 @@
 import argparse
-from scrapers.ase.ase_2024_url_scraper import ASEScraper2024URL
-from scrapers.ase.ase_2024_abstract_scraper import ASEScraper2024Abstract
-from scrapers.ase.ase_2025_scraper import ASEScraper2025
-from scrapers.aacr.aacr_2026_url_scraper import AACR2026URLScraper
-from scrapers.aacr.aacr_2026_abstract_scraper import AACR2026AbstractScraper
-from scrapers.aacr.aacr_2026_url_matcher import AACR2026URLMatcher
-from scrapers.sawc.sawc_spring_2026 import SAWCSpring2026 
+from scrapers.ase.ase_2024.url_scraper import ASEScraper2024URL
+from scrapers.ase.ase_2024.abstract_scraper import ASEScraper2024Abstract
+from scrapers.ase.ase_2025.scraper import ASEScraper2025
+from scrapers.aacr.aacr_2026.url_scraper import AACR2026URLScraper
+from scrapers.aacr.aacr_2026.abstract_scraper import AACR2026AbstractScraper
+from scrapers.aacr.aacr_2026.url_matcher import AACR2026URLMatcher
+from scrapers.sawc.sawc_spring_2026.abstract_scraper import SAWCSpring2026 
 
 SCRAPERS = {
     ("sciencedirect", "ase", "2024", "url-scraper"): ASEScraper2024URL,
@@ -15,6 +15,7 @@ SCRAPERS = {
     ("aacrjournals", "aacr", "2026", "abstract-scraper"): AACR2026AbstractScraper,
     ("aacrjournals", "aacr", "2026", "url-matcher"): AACR2026URLMatcher,
     ("hmpglobalevents", "sawc", "2026", "default"): SAWCSpring2026,
+    ("hmpglobalevents", "sawc", "2026", "abstract-scraper"): SAWCSpring2026,
 }
 
 def run(source: str, topic: str, year: str, task: str = "default"):

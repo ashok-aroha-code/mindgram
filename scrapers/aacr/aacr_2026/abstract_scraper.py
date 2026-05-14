@@ -79,7 +79,7 @@ class AACR2026AbstractScraper(BaseScraper):
                 "title": title,
                 "author_info": author_info,
                 "abstract": abstract_text,
-                "abstract_htm": abstract_html,
+                "abstract_html": abstract_html,
                 "abstract_markdown": "",
                 "abstract_metadata": {"session_name": session_name, "date": date},
             }, failures
