@@ -43,7 +43,8 @@ Apply to **all plain-text string fields** (in order):
 
 ---
 
-Note: In the author information, the format should strictly follow: 'author_name; affiliation, author_name; affiliation' and it should not be anything else. If the author information is not available, then it should be an empty string.
+Note: In the author information, the format should strictly follow: 'author_name; affiliation, author_name; affiliation' and it should not be anything else. If the author information is not available, then it should be an empty string. 
+- **Location Filtering**: Strip out room names, hall numbers, or session times (e.g., "Richardson A", "Room 201") that may be erroneously merged into the author string in the source HTML.
 
 ## 4. `abstract_metadata` — 21 Sub-Fields
 
@@ -118,7 +119,12 @@ When duplicates differ, keep the more complete record (more non-empty fields).
 
 ---
 
-## 6. Output Format
+## 6. Advanced DOM Scenarios
+
+- **Fragmented Titles**: If a title is split across multiple tags (e.g., `<h2><span>Part 1</span> Part 2</h2>`), ensure all text nodes are concatenated with a single space.
+- **Hidden Session Logic**: For SPAs, verify that the session being scraped is the *correct* one by matching the title or index against the metadata from `urls.json`.
+
+## 7. Output Format
 
 - UTF-8 encoded JSON array.
 - No trailing commas. Validate JSON before saving.

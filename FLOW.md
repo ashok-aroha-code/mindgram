@@ -12,6 +12,7 @@ Collect all abstract or presentation URLs from the target website.
 * Handle pagination completely
 * Collect every abstract URL
 * Avoid missing pages or URLs
+* **Capture Navigation Metadata**: For SPAs, include tab IDs, container IDs, or indices in the output JSON to assist the Abstract Scraper.
 * Support resume capability
 
 ### Output
@@ -46,6 +47,9 @@ Scrape all abstract data from the collected URLs.
 
   * Use `""` for string fields
   * Use `[]` for array fields
+* **Handle Lazy Loading**: Implement "Brute Force Scrolling" to the bottom of the page to ensure all dynamic/lazy-loaded content is rendered before extraction.
+* **Metadata-Driven Navigation**: Use the IDs/indices provided by the URL scraper to reach the target content (e.g., clicking a specific tab or expanding a specific accordion).
+* **Composite Resumption**: Use a `(link, title)` composite key for resume logic if multiple abstracts share the same base URL.
 * Support resume capability
 
 ### Output
